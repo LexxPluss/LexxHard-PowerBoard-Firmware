@@ -1,0 +1,11 @@
+{
+    "LEXXPLUSS_PB01": {
+        "inherits": [
+            "MCU_STM32F103xB"
+        ],
+        "detect_code": [
+            "1234"
+        ],
+        "device_name": "STM32F103CB"
+    }
+}

@@ -1,0 +1,8 @@
+{
+    "requres": ["bare-metal", "events"],
+    "target_overrides": {
+        "*": {
+           "target.c_lib": "small" 
+        }
+    }
+}
