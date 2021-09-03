@@ -44,7 +44,7 @@ private:
 class can_driver {
 public:
     can_driver() {
-        can.frequency(500000); //@@
+        can.frequency(500000);
     }
     void poll() {
         CANMessage msg;
@@ -73,7 +73,7 @@ public:
             prev = now;
             timer.reset();
             timer.start();
-        } else {
+        } else if (now == 0) {
             auto elapsed = timer.elapsed_time();
             if (elapsed > 10s) {
                 if (state != STATE::LONG_PUSHED)
@@ -135,101 +135,38 @@ private:
 class bmu_control {
 public:
     bmu_control(can_driver &can) : can(can) {
-        for (auto i : {0x100, 0x101, 0x103, 0x110, 0x111, 0x112, 0x113, 0x120, 0x130})
+        for (auto i : {0x100, 0x101, 0x113})
             can.register_callback(i, 8, callback(this, &bmu_control::handle_can));
     }
     void set_enable(bool enable) {main_sw = enable ? 0 : 1;}
     void set_discharge(bool enable) {fet_active = enable ? 0 : 1;}
-    bool is_ok() const {return true;} //@@
-    struct {
-        uint8_t mod_status1, mod_status2, bmu_status, bmu_alarm1, bmu_alarm2;
-        uint8_t asoc, rsoc, soh;       // % (percent)
-        uint16_t fet_temperature;      // ddegC (deci-degree Celsius)
-        uint16_t pack_current;         // cA (centi-ampere)
-        uint16_t charging_current;     // cA (centi-ampere)
-        uint16_t pack_voltage;         // mV (milli-volt)
-        uint16_t design_capacity;      // cAh (centi-ampare-hour)
-        uint16_t full_charge_capacity; // cAh (centi-ampare-hour)
-        uint16_t remaining_capacity;   // cAh (centi-ampare-hour)
-        struct {
-            uint16_t v;                // mV (milli-volt)
-            uint8_t id;                // MOD ID
-        } max_module_voltage, min_module_voltage, max_cell_voltage, min_cell_voltage;
-        struct {
-            uint16_t t;                // ddegC (deci-degree Celsius)
-            uint8_t id;                // MOD ID
-        } max_module_temp, min_module_temp;
-        struct {
-            uint16_t a;                // cA (centi-ampere)
-            uint8_t id;                // MOD ID
-        } max_module_current, min_module_current;
-        uint8_t bmu_fw_ver, mod_fw_ver, serial_config, parallel_config;
-        uint16_t manufacturing_date, inspection_line_no, serial_number;
-    } data;
+    bool is_ok() const {
+        return ((data.mod_status1 & 0xbf) == 0 ||
+                (data.mod_status2 & 0xe1) == 0 ||
+                (data.bmu_alarm1  & 0xff) == 0 ||
+                (data.bmu_alarm2  & 0x01) == 0);
+    }
 private:
     void handle_can(const CANMessage &msg) {
         uint16_t msgid = (msg.id >> 8) & 0xffff;
         switch (msgid) {
         case 0x100:
-            data.mod_status1     = msg.data[0];
-            data.bmu_status      = msg.data[1];
-            data.asoc            = msg.data[2];
-            data.rsoc            = msg.data[3];
-            data.soh             = msg.data[4];
-            data.fet_temperature = (msg.data[5] << 8) | msg.data[6];
+            data.mod_status1 = msg.data[0];
             break;
         case 0x101:
-            data.pack_current     = (msg.data[0] << 8) | msg.data[1];
-            data.charging_current = (msg.data[2] << 8) | msg.data[3];
-            data.pack_voltage     = (msg.data[4] << 8) | msg.data[5];
-            data.mod_status2      = msg.data[6];
-            break;
-        case 0x103:
-            data.design_capacity      = (msg.data[0] << 8) | msg.data[1];
-            data.full_charge_capacity = (msg.data[2] << 8) | msg.data[3];
-            data.remaining_capacity   = (msg.data[4] << 8) | msg.data[5];
-            break;
-        case 0x110:
-            data.max_module_voltage.v  = (msg.data[0] << 8) | msg.data[1];
-            data.max_module_voltage.id = msg.data[2];
-            data.min_module_voltage.v  = (msg.data[4] << 8) | msg.data[5];
-            data.min_module_voltage.id = msg.data[6];
-            break;
-        case 0x111:
-            data.max_module_temp.t  = (msg.data[0] << 8) | msg.data[1];
-            data.max_module_temp.id = msg.data[2];
-            data.min_module_temp.t  = (msg.data[4] << 8) | msg.data[5];
-            data.min_module_temp.id = msg.data[6];
-            break;
-        case 0x112:
-            data.max_module_current.a  = (msg.data[0] << 8) | msg.data[1];
-            data.max_module_current.id = msg.data[2];
-            data.min_module_current.a  = (msg.data[4] << 8) | msg.data[5];
-            data.min_module_current.id = msg.data[6];
+            data.mod_status2 = msg.data[6];
             break;
         case 0x113:
-            data.bmu_fw_ver      = msg.data[0];
-            data.mod_fw_ver      = msg.data[1];
-            data.serial_config   = msg.data[2];
-            data.parallel_config = msg.data[3];
-            data.bmu_alarm1      = msg.data[4];
-            data.bmu_alarm2      = msg.data[5];
-            break;
-        case 0x120:
-            data.max_cell_voltage.v  = (msg.data[0] << 8) | msg.data[1];
-            data.max_cell_voltage.id = msg.data[2];
-            data.min_cell_voltage.v  = (msg.data[4] << 8) | msg.data[5];
-            data.min_cell_voltage.id = msg.data[6];
-            break;
-        case 0x130:
-            data.manufacturing_date = (msg.data[0] << 8) | msg.data[1];
-            data.inspection_line_no = (msg.data[2] << 8) | msg.data[3];
-            data.serial_number      = (msg.data[4] << 8) | msg.data[5];
+            data.bmu_alarm1 = msg.data[4];
+            data.bmu_alarm2 = msg.data[5];
             break;
         }
     }
     can_driver &can;
     DigitalOut main_sw{PB_11, 1}, fet_active{PB_12, 1};
+    struct {
+        uint8_t mod_status1{0xff}, mod_status2{0xff}, bmu_alarm1{0xff}, bmu_alarm2{0xff};
+    } data;
 };
 
 class temperature_sensor {
@@ -263,63 +200,76 @@ struct dcbatout : public dcdc_base {
 
 class state_controller {
 public:
-    state_controller(can_driver &can) : can(can) {
-        statetimer.reset();
-        statetimer.start();
-    }
-    void poll() {
+    void handler() {
+        can.poll();
         psw.poll();
         ac.poll();
+        poll();
+    }
+private:
+    void poll() {
         switch (state) {
         case POWER_STATE::OFF:
-            new_state(mc.get_plugged() ? POWER_STATE::POST : POWER_STATE::WAIT_SW);
+            set_new_state(mc.get_plugged() ? POWER_STATE::POST : POWER_STATE::WAIT_SW);
             break;
         case POWER_STATE::WAIT_SW:
             if (psw.get_state() != power_switch::STATE::RELEASED) {
+                poweron_by_switch = true;
                 psw.reset_state();
-                new_state(POWER_STATE::POST);
+                set_new_state(POWER_STATE::POST);
             }
             break;
         case POWER_STATE::POST:
-            if (!mc.get_plugged())
-                new_state(POWER_STATE::OFF);
+            if (!poweron_by_switch && !mc.get_plugged())
+                set_new_state(POWER_STATE::OFF);
             if (bmu.is_ok() && temp.is_ok())
-                new_state(POWER_STATE::DISCHARGE_LOW);
-            else if (statetimer.elapsed_time() > 3s)
-                new_state(POWER_STATE::OFF);
+                set_new_state(POWER_STATE::DISCHARGE_LOW);
+            else if (timer_post.elapsed_time() > 3s)
+                set_new_state(POWER_STATE::OFF);
             break;
-        case POWER_STATE::DISCHARGE_LOW:
-            if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dc5.is_ok() || !dc16.is_ok())
-                new_state(POWER_STATE::OFF);
+        case POWER_STATE::DISCHARGE_LOW: {
+            auto psw_state = psw.get_state();
+            if (!dc5.is_ok() || !dc16.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED)
+                set_new_state(POWER_STATE::OFF);
+            if (psw_state == power_switch::STATE::PUSHED || !bmu.is_ok() || !temp.is_ok()) {
+                if (wait_shutdown) {
+                    if (timer_shutdown.elapsed_time() > 60s)
+                        set_new_state(POWER_STATE::OFF);
+                } else {
+                    wait_shutdown = true;
+                    timer_shutdown.reset();
+                    timer_shutdown.start();
+                }
+            }
             if (!bsw.asserted() && !esw.asserted())
-                new_state(POWER_STATE::NORMAL);
+                set_new_state(POWER_STATE::NORMAL);
             break;
+        }
         case POWER_STATE::NORMAL:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dc5.is_ok() || !dc16.is_ok() || bsw.asserted() || esw.asserted())
-                new_state(POWER_STATE::DISCHARGE_LOW);
+                set_new_state(POWER_STATE::DISCHARGE_LOW);
             if (mc.get_plugged())
-                new_state(POWER_STATE::MANUAL_CHARGE);
+                set_new_state(POWER_STATE::MANUAL_CHARGE);
             if (ac.get_docked())
-                new_state(POWER_STATE::AUTO_CHARGE);
+                set_new_state(POWER_STATE::AUTO_CHARGE);
             break;
         case POWER_STATE::AUTO_CHARGE:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dc5.is_ok() || !dc16.is_ok() || bsw.asserted() || esw.asserted())
-                new_state(POWER_STATE::DISCHARGE_LOW);
+                set_new_state(POWER_STATE::DISCHARGE_LOW);
             if (!ac.get_docked() || ac.get_connector_overheat())
-                new_state(POWER_STATE::NORMAL);
+                set_new_state(POWER_STATE::NORMAL);
             break;
         case POWER_STATE::MANUAL_CHARGE:
             if (psw.get_state() != power_switch::STATE::RELEASED)
                 psw.reset_state();
             if (!bmu.is_ok() || !temp.is_ok() || !dc5.is_ok() || !dc16.is_ok() || bsw.asserted() || esw.asserted())
-                new_state(POWER_STATE::DISCHARGE_LOW);
+                set_new_state(POWER_STATE::DISCHARGE_LOW);
             if (!mc.get_plugged())
-                new_state(POWER_STATE::NORMAL);
+                set_new_state(POWER_STATE::NORMAL);
             break;
         }
     }
-private:
-    void new_state(POWER_STATE newstate) {
+    void set_new_state(POWER_STATE newstate) {
         switch (newstate) {
         case POWER_STATE::OFF:
             bmu.set_discharge(false);
@@ -331,9 +281,11 @@ private:
             break;
         case POWER_STATE::POST:
             bmu.set_enable(true);
+            bmu.set_discharge(true);
+            timer_post.reset();
+            timer_post.start();
             break;
         case POWER_STATE::DISCHARGE_LOW:
-            bmu.set_discharge(true);
             dc5.set_enable(true);
             dc16.set_enable(true);
             break;
@@ -349,10 +301,8 @@ private:
             break;
         }
         state = newstate;
-        statetimer.reset();
-        statetimer.start();
     }
-    can_driver &can;
+    can_driver can;
     power_switch psw;
     bumber_switch bsw;
     emergency_switch esw;
@@ -364,27 +314,17 @@ private:
     dcdc16 dc16;
     dcbatout dcout;
     POWER_STATE state{POWER_STATE::OFF};
-    Timer statetimer;
-};
-
-class event_handler {
-public:
-    void handler() {
-        can.poll();
-        ctrl.poll();
-    }
-private:
-    can_driver can;
-    state_controller ctrl{can};
+    Timer timer_post, timer_shutdown;
+    bool poweron_by_switch{false}, wait_shutdown{false};
 };
 
 }
 
 int main()
 {
-    event_handler h;
+    state_controller ctrl;
     EventQueue queue;
-    queue.call_every(10ms, &h, &event_handler::handler);
+    queue.call_every(10ms, &ctrl, &state_controller::handler);
     queue.dispatch_forever();
     return 0;
 }
