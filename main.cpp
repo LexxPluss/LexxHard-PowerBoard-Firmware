@@ -123,13 +123,20 @@ private:
 
 class auto_charger {
 public:
-    bool get_docked() {return din.read() == 0;}
-    void set_enable(bool enable) {dout = enable ? 1 : 0;}
-    bool get_connector_overheat() {return false;}
-    void poll() {}
+    bool get_docked() {return connector_v > 0.05f;} //@@
+    void set_enable(bool enable) {sw = enable ? 1 : 0;}
+    bool get_connector_overheat() {
+        return temp_v[0] > 0.1f || temp_v[1] > 0.1f; //@@
+    }
+    void poll() {
+        connector_v = connector.read();
+        temp_v[0] = temp[0].read();
+        temp_v[1] = temp[1].read();
+    }
 private:
-    DigitalIn din{PB_1, PullUp};
-    DigitalOut dout{PB_2, 0};
+    AnalogIn connector{PB_1}, temp[2]{PA_0, PA_1};
+    DigitalOut sw{PB_2, 0};
+    float connector_v{0.0f}, temp_v[2]{0.0f, 0.0f};
 };
 
 class bmu_control {
@@ -288,6 +295,8 @@ private:
         case POWER_STATE::DISCHARGE_LOW:
             dc5.set_enable(true);
             dc16.set_enable(true);
+            dcout.set_enable(false);
+            ac.set_enable(false);
             break;
         case POWER_STATE::NORMAL:
             dcout.set_enable(true);
@@ -297,6 +306,7 @@ private:
             ac.set_enable(true);
             break;
         case POWER_STATE::MANUAL_CHARGE:
+            dcout.set_enable(false);
             ac.set_enable(false);
             break;
         }
