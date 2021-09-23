@@ -9,8 +9,10 @@ https://developer.arm.com/tools-and-software/open-source-software/developer-tool
 ## Build
 
 ```bash
+$ git clone https://github.com/LexxPluss/mbed-os-chargingboard.git
 $ git clone https://github.com/LexxPluss/mbed-os-powerboard.git
 $ cd mbed-os-powerboard
+$ ln -s ../mbed-os-chargingboard/serial_message.hpp
 $ mbed-tools deploy
 $ mbed-tools compile -m LEXXPLUSS_PB01 -t GCC_ARM
 ```

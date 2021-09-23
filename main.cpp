@@ -1,4 +1,5 @@
 #include "mbed.h"
+#include "serial_message.hpp"
 
 namespace {
 
@@ -12,9 +13,11 @@ enum class POWER_STATE {
     MANUAL_CHARGE,
 };
 
+EventQueue queue;
+
 class can_callback {
 public:
-    void register_callback(int msgid, int len, Callback<void(const CANMessage &msg)> func) {
+    void register_callback(uint32_t msgid, uint32_t len, Callback<void(const CANMessage &msg)> func) {
         if (count < NUM) {
             callbacks[count].msgid = msgid;
             callbacks[count].len = len;
@@ -24,8 +27,7 @@ public:
     }
     bool call_callbacks(const CANMessage &msg) {
         for (int i = 0; i < count; ++i) {
-            uint16_t msgid = (msg.id >> 8) & 0xffff;
-            if (msgid == callbacks[i].msgid && msg.len == callbacks[i].len) {
+            if (msg.id == callbacks[i].msgid && msg.len == callbacks[i].len) {
                 callbacks[i].func(msg);
                 return true;
             }
@@ -36,7 +38,7 @@ private:
     int count{0};
     static const int NUM{8};
     struct {
-        int msgid, len;
+        uint32_t msgid, len;
         Callback<void(const CANMessage &msg)> func;
     } callbacks[NUM];
 };
@@ -51,8 +53,8 @@ public:
         if (can.read(msg) != 0 && msg.type == CANData)
             callback.call_callbacks(msg);
     }
-    void register_callback(int msgid, int len, Callback<void(const CANMessage &msg)> func) {
-        can.filter(msgid << 8, 0x00ffff00u, CANExtended, filter_handle);
+    void register_callback(uint32_t msgid, uint32_t len, Callback<void(const CANMessage &msg)> func) {
+        can.filter(msgid, 0x000007ffu, CANStandard, filter_handle);
         callback.register_callback(msgid, len, func);
         filter_handle = (filter_handle + 1) % 14; // STM CAN filter size
     }
@@ -123,19 +125,58 @@ private:
 
 class auto_charger {
 public:
-    bool get_docked() {return connector_v > 0.05f;} //@@
+    void init() {
+        serial.set_baud(4800);
+        serial.set_format(8, SerialBase::None, 1);
+        serial.set_blocking(false);
+        queue.call_every(1s, this, &auto_charger::poll_1s);
+        heartbeat_timer.start();
+        msg.init();
+    }
+    bool get_docked() {
+        return is_connected() && heartbeat_timer.elapsed_time() < 5s;
+    }
     void set_enable(bool enable) {sw = enable ? 1 : 0;}
     bool get_connector_overheat() {
-        return temp_v[0] > 0.1f || temp_v[1] > 0.1f; //@@
+        return temp_v[0] > 2.0f || temp_v[1] > 2.0f; //@@
     }
     void poll() {
-        connector_v = connector.read();
-        temp_v[0] = temp[0].read();
-        temp_v[1] = temp[1].read();
+        connector_v = connector.read_voltage();
+        temp_v[0] = temp[0].read_voltage();
+        temp_v[1] = temp[1].read_voltage();
+        auto polled = serial.poll(0);
+        if (polled & POLLIN) {
+            uint8_t buf[64];
+            int n = serial.read(buf, sizeof buf);
+            if (n > 0) {
+                if (msg.decode(buf, n)) {
+                    uint8_t param[3];
+                    uint8_t command = msg.get_command(param);
+                    if (command == serial_message::HEARTBEAT && param[0] == heartbeat_counter)
+                        heartbeat_timer.reset();
+                }
+            }
+        }
     }
 private:
-    AnalogIn connector{PB_1}, temp[2]{PA_0, PA_1};
+    bool is_connected() const {
+        return connector_v > 1.0f; //@@
+    }
+    void poll_1s() {
+        if (is_connected())
+            send_heartbeat();
+    }
+    void send_heartbeat() {
+        uint8_t buf[8], param[3]{++heartbeat_counter};
+        serial_message::compose(buf, serial_message::HEARTBEAT, param);
+        serial.write(buf, sizeof buf);
+    }
+    BufferedSerial serial{PA_2, PA_3};
+    AnalogIn connector{PB_1, 3.3f}, temp[2]{{PA_0, 3.3f}, {PA_1, 3.3f}};
     DigitalOut sw{PB_2, 0};
+    Timer heartbeat_timer;
+    serial_message msg;
+    uint8_t heartbeat_counter{0};
     float connector_v{0.0f}, temp_v[2]{0.0f, 0.0f};
 };
 
@@ -155,8 +196,7 @@ public:
     }
 private:
     void handle_can(const CANMessage &msg) {
-        uint16_t msgid = (msg.id >> 8) & 0xffff;
-        switch (msgid) {
+        switch (msg.id) {
         case 0x100:
             data.mod_status1 = msg.data[0];
             break;
@@ -207,14 +247,15 @@ struct dcbatout : public dcdc_base {
 
 class state_controller {
 public:
-    void handler() {
-        can.poll();
-        psw.poll();
-        ac.poll();
-        poll();
+    void init() {
+        ac.init();
+        queue.call_every(20ms, this, &state_controller::poll);
     }
 private:
     void poll() {
+        can.poll();
+        psw.poll();
+        ac.poll();
         switch (state) {
         case POWER_STATE::OFF:
             set_new_state(mc.get_plugged() ? POWER_STATE::POST : POWER_STATE::WAIT_SW);
@@ -333,10 +374,9 @@ private:
 int main()
 {
     state_controller ctrl;
-    EventQueue queue;
-    queue.call_every(10ms, &ctrl, &state_controller::handler);
+    ctrl.init();
     queue.dispatch_forever();
     return 0;
 }
 
-/* vim: set expandtab shiftwidth=4: */
+// vim: set expandtab shiftwidth=4:
