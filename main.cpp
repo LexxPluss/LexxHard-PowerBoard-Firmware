@@ -93,10 +93,10 @@ public:
     }
     STATE get_state() const {return state;}
 private:
-  DigitalIn din{PB_0, PullUp};
-  Timer timer;
-  STATE state{STATE::RELEASED};
-  int prev{-1};
+    DigitalIn din{PB_0, PullUp};
+    Timer timer;
+    STATE state{STATE::RELEASED};
+    int prev{-1};
 };
 
 class switch_base {
@@ -125,6 +125,7 @@ private:
 
 class auto_charger {
 public:
+    auto_charger(I2C &i2c) : i2c(i2c) {}
     void init() {
         serial.set_baud(4800);
         serial.set_format(8, SerialBase::None, 1);
@@ -136,14 +137,24 @@ public:
     bool get_docked() {
         return is_connected() && heartbeat_timer.elapsed_time() < 5s;
     }
-    void set_enable(bool enable) {sw = enable ? 1 : 0;}
+    void set_enable(bool enable) {
+        uint8_t command;
+        if (enable) {
+            sw.write(1);
+            command = serial_message::POWERON;
+        } else {
+            sw.write(0);
+            command = serial_message::POWEROFF;
+        }
+        uint8_t buf[8];
+        serial_message::compose(buf, command, nullptr);
+        serial.write(buf, sizeof buf);
+    }
     bool get_connector_overheat() {
-        return temp_v[0] > 2.0f || temp_v[1] > 2.0f; //@@
+        return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
     }
     void poll() {
         connector_v = connector.read_voltage();
-        temp_v[0] = temp[0].read_voltage();
-        temp_v[1] = temp[1].read_voltage();
         auto polled = serial.poll(0);
         if (polled & POLLIN) {
             uint8_t buf[64];
@@ -157,10 +168,54 @@ public:
                 }
             }
         }
+        adc_ticktock();
     }
 private:
+    void adc_ticktock() {
+        if (adc_measure_mode)
+            adc_read();
+        else
+            adc_measure();
+    }
+    void adc_read() {
+        uint8_t buf[2];
+        buf[0] = 0b00000000; // Conversion Register
+        if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1) == 0 &&
+            i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
+            int16_t value = (buf[1] << 8) | buf[0];
+            float voltage = static_cast<float>(value) / 32768.0f * 4.096f;
+            calculate_temperature(voltage);
+        }
+        adc_ch = adc_ch == 0 ? 1 : 0;
+        adc_measure_mode = false;
+    }
+    void adc_measure() {
+        uint8_t buf[3];
+        buf[0] = 0b00000001; // Config Register
+        buf[1] = 0b10000011; // Start, FSR4.096V, Single
+        buf[2] = 0b10000011; // 128SPS
+        switch (adc_ch) {
+        default:
+        case 0: buf[1] |= 0b01000000; break;
+        case 1: buf[1] |= 0b01010000; break;
+        case 2: buf[1] |= 0b01100000; break;
+        case 3: buf[1] |= 0b01110000; break;
+        }
+        i2c.write(ADDR, reinterpret_cast<const char*>(buf), sizeof buf);
+        adc_measure_mode = true;
+    }
+    void calculate_temperature(float adc_voltage) {
+        // see https://lexxpluss.esa.io/posts/459
+        if (adc_voltage > 3.3f)
+            adc_voltage = 3.3f;
+        if (adc_voltage < 0.0f)
+            adc_voltage = 0.0f;
+        float R = 10000.0f * adc_voltage / (3.3f - adc_voltage);
+        float T = 1.0f / (logf(R / 3300.0f) / 3970.0f + 1.0f / 373.0f);
+        connector_temp[adc_ch] = T - 273.0f;
+    }
     bool is_connected() const {
-        return connector_v > 1.0f; //@@
+        return connector_v > 1.0f;
     }
     void poll_1s() {
         if (is_connected())
@@ -171,13 +226,17 @@ private:
         serial_message::compose(buf, serial_message::HEARTBEAT, param);
         serial.write(buf, sizeof buf);
     }
+    I2C &i2c;
     BufferedSerial serial{PA_2, PA_3};
-    AnalogIn connector{PB_1, 3.3f}, temp[2]{{PA_0, 3.3f}, {PA_1, 3.3f}};
+    AnalogIn connector{PB_1, 3.3f};
     DigitalOut sw{PB_2, 0};
     Timer heartbeat_timer;
     serial_message msg;
     uint8_t heartbeat_counter{0};
-    float connector_v{0.0f}, temp_v[2]{0.0f, 0.0f};
+    float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
+    int adc_ch{0};
+    bool adc_measure_mode{false};
+    static constexpr int ADDR{0b10010000};
 };
 
 class bmu_control {
@@ -186,8 +245,7 @@ public:
         for (auto i : {0x100, 0x101, 0x113})
             can.register_callback(i, 8, callback(this, &bmu_control::handle_can));
     }
-    void set_enable(bool enable) {main_sw = enable ? 0 : 1;}
-    void set_discharge(bool enable) {fet_active = enable ? 0 : 1;}
+    void set_enable(bool enable) {main_sw = enable ? 1 : 0;}
     bool is_ok() const {
         return ((data.mod_status1 & 0xbf) == 0 ||
                 (data.mod_status2 & 0xe1) == 0 ||
@@ -210,7 +268,7 @@ private:
         }
     }
     can_driver &can;
-    DigitalOut main_sw{PB_11, 1}, fet_active{PB_12, 1};
+    DigitalOut main_sw{PB_11, 0};
     struct {
         uint8_t mod_status1{0xff}, mod_status2{0xff}, bmu_alarm1{0xff}, bmu_alarm2{0xff};
     } data;
@@ -218,8 +276,34 @@ private:
 
 class temperature_sensor {
 public:
-    bool is_ok() const {return true;} //@@
+    temperature_sensor(I2C &i2c) : i2c(i2c) {}
+    void init() {
+        uint8_t buf[2];
+        buf[0] = 0x0b; // ID Register
+        if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
+            i2c.read(ADDR, reinterpret_cast<char*>(buf), 1) == 0 &&
+            (buf[0] & 0b11111000) == 0b11001000) {
+            buf[0] = 0x03; // Configuration Register
+            buf[1] = 0b10000000; // 16bit
+            i2c.write(ADDR, reinterpret_cast<const char*>(buf), 2);
+        }
+    }
+    bool is_ok() const {
+        return temperature < 80.0f;
+    }
+    void poll() {
+        uint8_t buf[2];
+        buf[0] = 0x00; // Temperature Value MSB Register
+        if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
+            i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
+            int16_t value = (buf[0] << 8) | buf[1];
+            temperature = value / 128.0f;
+        }
+    }
 private:
+    I2C &i2c;
+    float temperature{0.0f};
+    static constexpr int ADDR{0b10010000};
 };
 
 class dcdc_base {
@@ -241,14 +325,12 @@ struct dcdc16 : public dcdc_base {
     dcdc16() : dcdc_base(PB_3, PB_4) {}
 };
 
-struct dcbatout : public dcdc_base {
-    dcbatout() : dcdc_base(PB_5, PB_8) {}
-};
-
 class state_controller {
 public:
     void init() {
+        i2c.frequency(100000);
         ac.init();
+        temp.init();
         queue.call_every(20ms, this, &state_controller::poll);
     }
 private:
@@ -256,6 +338,7 @@ private:
         can.poll();
         psw.poll();
         ac.poll();
+        temp.poll();
         switch (state) {
         case POWER_STATE::OFF:
             set_new_state(mc.get_plugged() ? POWER_STATE::POST : POWER_STATE::WAIT_SW);
@@ -320,7 +403,7 @@ private:
     void set_new_state(POWER_STATE newstate) {
         switch (newstate) {
         case POWER_STATE::OFF:
-            bmu.set_discharge(false);
+            poweron_by_switch = false;
             bmu.set_enable(false);
             while (true) // wait power off
                 continue;
@@ -329,41 +412,41 @@ private:
             break;
         case POWER_STATE::POST:
             bmu.set_enable(true);
-            bmu.set_discharge(true);
             timer_post.reset();
             timer_post.start();
             break;
         case POWER_STATE::DISCHARGE_LOW:
             dc5.set_enable(true);
             dc16.set_enable(true);
-            dcout.set_enable(false);
+            dcout.write(0);
             ac.set_enable(false);
             break;
         case POWER_STATE::NORMAL:
-            dcout.set_enable(true);
+            dcout.write(1);
             ac.set_enable(false);
             break;
         case POWER_STATE::AUTO_CHARGE:
             ac.set_enable(true);
             break;
         case POWER_STATE::MANUAL_CHARGE:
-            dcout.set_enable(false);
+            dcout.write(0);
             ac.set_enable(false);
             break;
         }
         state = newstate;
     }
+    I2C i2c{PB_7, PB_6};
     can_driver can;
     power_switch psw;
     bumber_switch bsw;
     emergency_switch esw;
     manual_charger mc;
-    auto_charger ac;
+    auto_charger ac{i2c};
     bmu_control bmu{can};
-    temperature_sensor temp;
+    temperature_sensor temp{i2c};
     dcdc5 dc5;
     dcdc16 dc16;
-    dcbatout dcout;
+    DigitalOut dcout{PB_5, 0};
     POWER_STATE state{POWER_STATE::OFF};
     Timer timer_post, timer_shutdown;
     bool poweron_by_switch{false}, wait_shutdown{false};
