@@ -3,17 +3,16 @@
 
 namespace {
 
-enum class POWER_STATE {
-    OFF,
-    WAIT_SW,
-    POST,
-    DISCHARGE_LOW,
-    NORMAL,
-    AUTO_CHARGE,
-    MANUAL_CHARGE,
-};
+#undef DEBUG
+#ifdef DEBUG
+BufferedSerial debugserial{PA_2, PA_3};
+FILE *debugout = fdopen(&debugserial, "r+");
+#define LOG(...) fprintf(debugout, __VA_ARGS__)
+#else
+#define LOG(...) [](){}() // lambda empty function
+#endif
 
-EventQueue queue;
+EventQueue globalqueue;
 
 class can_callback {
 public:
@@ -72,6 +71,7 @@ public:
     void poll() {
         int now = din.read();
         if (prev != now) {
+            LOG("power_switch change to %d\n", now);
             prev = now;
             timer.reset();
             timer.start();
@@ -127,10 +127,12 @@ class auto_charger {
 public:
     auto_charger(I2C &i2c) : i2c(i2c) {}
     void init() {
+#ifndef DEBUG
         serial.set_baud(4800);
         serial.set_format(8, SerialBase::None, 1);
         serial.set_blocking(false);
-        queue.call_every(1s, this, &auto_charger::poll_1s);
+#endif
+        globalqueue.call_every(1s, this, &auto_charger::poll_1s);
         heartbeat_timer.start();
         msg.init();
     }
@@ -148,26 +150,27 @@ public:
         }
         uint8_t buf[8];
         serial_message::compose(buf, command, nullptr);
+#ifndef DEBUG
         serial.write(buf, sizeof buf);
+#endif
     }
     bool get_connector_overheat() {
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
     }
     void poll() {
         connector_v = connector.read_voltage();
-        auto polled = serial.poll(0);
-        if (polled & POLLIN) {
-            uint8_t buf[64];
-            int n = serial.read(buf, sizeof buf);
-            if (n > 0) {
-                if (msg.decode(buf, n)) {
-                    uint8_t param[3];
-                    uint8_t command = msg.get_command(param);
-                    if (command == serial_message::HEARTBEAT && param[0] == heartbeat_counter)
-                        heartbeat_timer.reset();
-                }
+#ifndef DEBUG
+        while (serial.readable()) {
+            uint8_t data;
+            serial.read(&data, 1);
+            if (msg.decode(data)) {
+                uint8_t param[3];
+                uint8_t command = msg.get_command(param);
+                if (command == serial_message::HEARTBEAT && param[0] == heartbeat_counter)
+                    heartbeat_timer.reset();
             }
         }
+#endif
         adc_ticktock();
     }
 private:
@@ -205,13 +208,14 @@ private:
         adc_measure_mode = true;
     }
     void calculate_temperature(float adc_voltage) {
-        // see https://lexxpluss.esa.io/posts/459
         if (adc_voltage > 3.3f)
             adc_voltage = 3.3f;
         if (adc_voltage < 0.0f)
             adc_voltage = 0.0f;
-        float R = 10000.0f * adc_voltage / (3.3f - adc_voltage);
-        float T = 1.0f / (logf(R / 3300.0f) / 3970.0f + 1.0f / 373.0f);
+        // see https://lexxpluss.esa.io/posts/459
+        static constexpr float Rpu = 10000.0f, R0 = 3300.0f, B = 3970.0f, T0 = 373.0f;
+        float R = Rpu * adc_voltage / (3.3f - adc_voltage);
+        float T = 1.0f / (logf(R / R0) / B + 1.0f / T0);
         connector_temp[adc_ch] = T - 273.0f;
     }
     bool is_connected() const {
@@ -224,10 +228,14 @@ private:
     void send_heartbeat() {
         uint8_t buf[8], param[3]{++heartbeat_counter};
         serial_message::compose(buf, serial_message::HEARTBEAT, param);
+#ifndef DEBUG
         serial.write(buf, sizeof buf);
+#endif
     }
     I2C &i2c;
+#ifndef DEBUG
     BufferedSerial serial{PA_2, PA_3};
+#endif
     AnalogIn connector{PB_1, 3.3f};
     DigitalOut sw{PB_2, 0};
     Timer heartbeat_timer;
@@ -306,23 +314,25 @@ private:
     static constexpr int ADDR{0b10010000};
 };
 
-class dcdc_base {
+class dcdc_converter {
 public:
-    void set_enable(bool enable) {control = enable ? 1 : 0;}
-    bool is_ok() {return fail.read() != 0;}
-protected:
-    dcdc_base(PinName control_pin, PinName fail_pin) : control(control_pin, 0), fail(fail_pin, PullUp) {}
+    void set_enable(bool enable) {
+        if (enable) {
+            control[0].write(1); // 5V must be turned on first.
+            ThisThread::sleep_for(1ms);
+            control[1].write(1);
+        } else {
+            control[1].write(0); // 16V must be turned off first.
+            ThisThread::sleep_for(1ms);
+            control[0].write(0);
+        }
+    }
+    bool is_ok() {
+        return fail[0].read() != 0 || fail[1].read() != 0;
+    }
 private:
-    DigitalOut control;
-    DigitalIn fail;
-};
-
-struct dcdc5 : public dcdc_base {
-    dcdc5() : dcdc_base(PA_10, PA_15) {}
-};
-
-struct dcdc16 : public dcdc_base {
-    dcdc16() : dcdc_base(PB_3, PB_4) {}
+    DigitalOut control[2]{{PA_10, 0}, {PB_3, 0}};
+    DigitalIn fail[2]{{PA_15, PullNone}, {PB_4, PullNone}};
 };
 
 class state_controller {
@@ -331,9 +341,18 @@ public:
         i2c.frequency(100000);
         ac.init();
         temp.init();
-        queue.call_every(20ms, this, &state_controller::poll);
+        globalqueue.call_every(20ms, this, &state_controller::poll);
     }
 private:
+    enum class POWER_STATE {
+        OFF,
+        WAIT_SW,
+        POST,
+        DISCHARGE_LOW,
+        NORMAL,
+        AUTO_CHARGE,
+        MANUAL_CHARGE,
+    };
     void poll() {
         can.poll();
         psw.poll();
@@ -360,7 +379,7 @@ private:
             break;
         case POWER_STATE::DISCHARGE_LOW: {
             auto psw_state = psw.get_state();
-            if (!dc5.is_ok() || !dc16.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED)
+            if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED)
                 set_new_state(POWER_STATE::OFF);
             if (psw_state == power_switch::STATE::PUSHED || !bmu.is_ok() || !temp.is_ok()) {
                 if (wait_shutdown) {
@@ -377,7 +396,7 @@ private:
             break;
         }
         case POWER_STATE::NORMAL:
-            if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dc5.is_ok() || !dc16.is_ok() || bsw.asserted() || esw.asserted())
+            if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() || bsw.asserted() || esw.asserted())
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
             if (mc.get_plugged())
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
@@ -385,7 +404,7 @@ private:
                 set_new_state(POWER_STATE::AUTO_CHARGE);
             break;
         case POWER_STATE::AUTO_CHARGE:
-            if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dc5.is_ok() || !dc16.is_ok() || bsw.asserted() || esw.asserted())
+            if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() || bsw.asserted() || esw.asserted())
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
             if (!ac.get_docked() || ac.get_connector_overheat())
                 set_new_state(POWER_STATE::NORMAL);
@@ -393,7 +412,7 @@ private:
         case POWER_STATE::MANUAL_CHARGE:
             if (psw.get_state() != power_switch::STATE::RELEASED)
                 psw.reset_state();
-            if (!bmu.is_ok() || !temp.is_ok() || !dc5.is_ok() || !dc16.is_ok() || bsw.asserted() || esw.asserted())
+            if (!bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() || bsw.asserted() || esw.asserted())
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
             if (!mc.get_plugged())
                 set_new_state(POWER_STATE::NORMAL);
@@ -403,33 +422,39 @@ private:
     void set_new_state(POWER_STATE newstate) {
         switch (newstate) {
         case POWER_STATE::OFF:
+            LOG("enter OFF\n");
             poweron_by_switch = false;
             bmu.set_enable(false);
             while (true) // wait power off
                 continue;
             break;
         case POWER_STATE::WAIT_SW:
+            LOG("enter WAIT_SW\n");
             break;
         case POWER_STATE::POST:
+            LOG("enter POST\n");
             bmu.set_enable(true);
             timer_post.reset();
             timer_post.start();
             break;
         case POWER_STATE::DISCHARGE_LOW:
-            dc5.set_enable(true);
-            dc16.set_enable(true);
-            dcout.write(0);
+            LOG("enter DISCHARGE_LOW\n");
+            dcdc.set_enable(true);
+            motor_out.write(0);
             ac.set_enable(false);
             break;
         case POWER_STATE::NORMAL:
-            dcout.write(1);
+            LOG("enter NORMAL\n");
+            motor_out.write(1);
             ac.set_enable(false);
             break;
         case POWER_STATE::AUTO_CHARGE:
+            LOG("enter AUTO_CHARGE\n");
             ac.set_enable(true);
             break;
         case POWER_STATE::MANUAL_CHARGE:
-            dcout.write(0);
+            LOG("enter MANUAL_CHARGE\n");
+            motor_out.write(0);
             ac.set_enable(false);
             break;
         }
@@ -444,9 +469,8 @@ private:
     auto_charger ac{i2c};
     bmu_control bmu{can};
     temperature_sensor temp{i2c};
-    dcdc5 dc5;
-    dcdc16 dc16;
-    DigitalOut dcout{PB_5, 0};
+    dcdc_converter dcdc;
+    DigitalOut motor_out{PB_5, 0};
     POWER_STATE state{POWER_STATE::OFF};
     Timer timer_post, timer_shutdown;
     bool poweron_by_switch{false}, wait_shutdown{false};
@@ -456,9 +480,10 @@ private:
 
 int main()
 {
+    LOG("RUN!\n");
     state_controller ctrl;
     ctrl.init();
-    queue.dispatch_forever();
+    globalqueue.dispatch_forever();
     return 0;
 }
 
