@@ -1,0 +1,9 @@
+[
+    {"name": "5V",    "bits": 1, "attr": "1:fail"},
+    {"name": "16V",   "bits": 1, "attr": "1:fail"},
+    {                 "bits": 2},
+    {"name": "C-FET", "bits": 1, "attr": "1:ON"},
+    {"name": "D-FET", "bits": 1, "attr": "1:ON"},
+    {"name": "P-DSG", "bits": 1, "attr": "1:ON"},
+    {                 "bits": 1}
+]

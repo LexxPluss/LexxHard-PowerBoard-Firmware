@@ -1,0 +1,8 @@
+[
+    {"name": "PWR",    "bits": 1, "attr": "1:ON"},
+    {"name": "EMG(L)", "bits": 1, "attr": "1:ON"},
+    {"name": "EMG(R)", "bits": 1, "attr": "1:ON"},
+    {"name": "BMP(L)", "bits": 1, "attr": "1:ON"},
+    {"name": "BMP(R)", "bits": 1, "attr": "1:ON"},
+    {                  "bits": 3}
+]

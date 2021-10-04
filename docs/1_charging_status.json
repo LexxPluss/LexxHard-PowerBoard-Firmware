@@ -1,0 +1,5 @@
+[
+    {"name": "MANUAL", "bits": 1, "attr": "1:charging"},
+    {"name": "AUTO",   "bits": 1, "attr": "1:charging"},
+    {                  "bits": 6}
+]
