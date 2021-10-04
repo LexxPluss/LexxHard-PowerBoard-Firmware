@@ -348,7 +348,7 @@ public:
     }
 private:
     DigitalOut control[2]{{PA_10, 0}, {PB_3, 0}};
-    DigitalIn fail[2]{{PA_15, PullNone}, {PB_4, PullNone}};
+    DigitalIn fail[2]{{PA_15}, {PB_4}};
 };
 
 class state_controller {
