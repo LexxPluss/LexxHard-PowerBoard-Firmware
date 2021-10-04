@@ -101,11 +101,11 @@ private:
 
 class switch_base {
 public:
-    bool asserted() {return sw0.read() == 0 || sw1.read() == 0;}
+    bool asserted() {return left.read() == 0 || right.read() == 0;}
 protected:
-    switch_base(PinName sw0_pin, PinName sw1_pin) : sw0(sw0_pin, PullUp), sw1(sw1_pin, PullUp) {}
+    switch_base(PinName left_pin, PinName right_pin) : left(left_pin, PullUp), right(right_pin, PullUp) {}
 private:
-    DigitalIn sw0, sw1;
+    DigitalIn left, right;
 };
 
 struct bumber_switch : public switch_base {
