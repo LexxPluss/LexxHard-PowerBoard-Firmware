@@ -155,19 +155,7 @@ public:
         return is_connected() && heartbeat_timer.elapsed_time() < 5s;
     }
     void set_enable(bool enable) {
-        uint8_t command;
-        if (enable) {
-            sw.write(1);
-            command = serial_message::POWERON;
-        } else {
-            sw.write(0);
-            command = serial_message::POWEROFF;
-        }
-        uint8_t buf[8];
-        serial_message::compose(buf, command, nullptr);
-#ifndef DEBUG
-        serial.write(buf, sizeof buf);
-#endif
+        sw.write(enable ? 1 : 0);
     }
     bool get_connector_overheat() const {
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
@@ -241,7 +229,7 @@ private:
             send_heartbeat();
     }
     void send_heartbeat() {
-        uint8_t buf[8], param[3]{++heartbeat_counter};
+        uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read())};
         serial_message::compose(buf, serial_message::HEARTBEAT, param);
 #ifndef DEBUG
         serial.write(buf, sizeof buf);
