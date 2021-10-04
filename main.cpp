@@ -249,7 +249,8 @@ private:
 
 class bmu_control {
 public:
-    bmu_control(can_driver &can) : can(can) {
+    bmu_control(can_driver &can) : can(can) {}
+    void init() {
         for (auto i : {0x100, 0x101, 0x113})
             can.register_callback(i, 8, callback(this, &bmu_control::handle_can));
     }
@@ -340,6 +341,7 @@ public:
     void init() {
         i2c.frequency(100000);
         ac.init();
+        bmu.init();
         temp.init();
         globalqueue.call_every(20ms, this, &state_controller::poll);
     }
