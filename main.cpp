@@ -116,6 +116,21 @@ struct emergency_switch : public switch_base {
     emergency_switch() : switch_base(PA_6, PA_7) {}
 };
 
+class wheel_switch {
+public:
+    void set_disable(bool disable) {
+        if (disable) {
+            left.write(1);
+            right.write(1);
+        } else {
+            left.write(0);
+            right.write(0);
+        }
+    }
+private:
+    DigitalOut left{PB_8, 0}, right{PB_9, 0};
+};
+
 class manual_charger {
 public:
     bool get_plugged() {return din.read() == 0;}
@@ -442,11 +457,13 @@ private:
         case POWER_STATE::DISCHARGE_LOW:
             LOG("enter DISCHARGE_LOW\n");
             dcdc.set_enable(true);
+            wsw.set_disable(true);
             bat_out.write(0);
             ac.set_enable(false);
             break;
         case POWER_STATE::NORMAL:
             LOG("enter NORMAL\n");
+            wsw.set_disable(false);
             bat_out.write(1);
             ac.set_enable(false);
             break;
@@ -456,6 +473,7 @@ private:
             break;
         case POWER_STATE::MANUAL_CHARGE:
             LOG("enter MANUAL_CHARGE\n");
+            wsw.set_disable(true);
             bat_out.write(0);
             ac.set_enable(false);
             break;
@@ -467,6 +485,7 @@ private:
     power_switch psw;
     bumber_switch bsw;
     emergency_switch esw;
+    wheel_switch wsw;
     manual_charger mc;
     auto_charger ac{i2c};
     bmu_control bmu{can};
