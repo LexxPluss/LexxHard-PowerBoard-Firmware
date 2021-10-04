@@ -259,10 +259,10 @@ public:
     }
     void set_enable(bool enable) {main_sw = enable ? 1 : 0;}
     bool is_ok() const {
-        return ((data.mod_status1 & 0xbf) == 0 ||
-                (data.mod_status2 & 0xe1) == 0 ||
-                (data.bmu_alarm1  & 0xff) == 0 ||
-                (data.bmu_alarm2  & 0x01) == 0);
+        return ((data.mod_status1 & 0b10111111) == 0 ||
+                (data.mod_status2 & 0b11100001) == 0 ||
+                (data.bmu_alarm1  & 0b11111111) == 0 ||
+                (data.bmu_alarm2  & 0b00000001) == 0);
     }
 private:
     void handle_can(const CANMessage &msg) {
