@@ -57,6 +57,9 @@ public:
         callback.register_callback(msgid, len, func);
         filter_handle = (filter_handle + 1) % 14; // STM CAN filter size
     }
+    void send(const CANMessage &msg) {
+        can.write(msg);
+    }
 private:
     CAN can{PA_11, PA_12};
     can_callback callback;
@@ -92,6 +95,9 @@ public:
         state = STATE::RELEASED;
     }
     STATE get_state() const {return state;}
+    bool get_raw_state() {
+        return din.read() == 0;
+    }
 private:
     DigitalIn din{PB_0, PullUp};
     Timer timer;
@@ -102,6 +108,10 @@ private:
 class switch_base {
 public:
     bool asserted() {return left.read() == 0 || right.read() == 0;}
+    void get_raw_state(bool &left, bool &right) {
+        left = this->left.read() == 0;
+        right = this->right.read() == 0;
+    }
 protected:
     switch_base(PinName left_pin, PinName right_pin) : left(left_pin, PullUp), right(right_pin, PullUp) {}
 private:
@@ -126,6 +136,10 @@ public:
             left.write(0);
             right.write(0);
         }
+    }
+    void get_raw_state(bool &left, bool &right) {
+        left = this->left.read() == 1;
+        right = this->right.read() == 1;
     }
 private:
     DigitalOut left{PB_8, 0}, right{PB_9, 0};
@@ -159,6 +173,10 @@ public:
     }
     bool get_connector_overheat() const {
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
+    }
+    void get_connector_temperature(int &positive, int &negative) const {
+        positive = connector_temp[0];
+        negative = connector_temp[1];
     }
     void poll() {
         connector_v = connector.read_voltage();
@@ -264,6 +282,11 @@ public:
                 (data.bmu_alarm1  & 0b11111111) == 0 ||
                 (data.bmu_alarm2  & 0b00000001) == 0);
     }
+    void get_fet_state(bool &c_fet, bool &d_fet, bool &p_dsg) {
+        c_fet = this->c_fet.read() == 1;
+        d_fet = this->d_fet.read() == 1;
+        p_dsg = this->p_dsg.read() == 1;
+    }
 private:
     void handle_can(const CANMessage &msg) {
         switch (msg.id) {
@@ -281,6 +304,7 @@ private:
     }
     can_driver &can;
     DigitalOut main_sw{PB_11, 0};
+    DigitalIn c_fet{PB_14}, d_fet{PB_15}, p_dsg{PA_9};
     struct {
         uint8_t mod_status1{0xff}, mod_status2{0xff}, bmu_alarm1{0xff}, bmu_alarm2{0xff};
     } data;
@@ -302,6 +326,14 @@ public:
     }
     bool is_ok() const {
         return temperature < 80.0f;
+    }
+    int get_temperature() const {
+        if (temperature > 127.0f)
+            return 127;
+        else if (temperature < -50.0f)
+            return -50;
+        else
+            return temperature;
     }
     void poll() {
         uint8_t buf[2];
@@ -334,9 +366,38 @@ public:
     bool is_ok() {
         return fail[0].read() != 0 || fail[1].read() != 0;
     }
+    void get_failed_state(bool &v5, bool &v16) {
+        v5 = fail[0].read() == 0;
+        v16 = fail[1].read() == 0;
+    }
 private:
     DigitalOut control[2]{{PA_10, 0}, {PB_3, 0}};
     DigitalIn fail[2]{{PA_15}, {PB_4}};
+};
+
+class fan_driver {
+public:
+    void init() {
+        pwm.period_us(1000000 / CONTROL_HZ);
+        pwm.pulsewidth_us(0);
+    }
+    void control_by_temperature(float temperature) {
+        int duty_percent;
+        if (temperature < 30.0f)
+            duty_percent = 10;
+        else if (temperature > 50.0f)
+            duty_percent = 100;
+        else
+            duty_percent = temperature * 4.5f - 125.0f; // Linearly interpolate between 30degC and 50degC.
+        int pulsewidth = duty_percent * 1000000 / 100 / CONTROL_HZ;
+        pwm.pulsewidth_us(pulsewidth);
+    }
+    int get_duty_percent() {
+        return pwm.read_pulsewitdth_us() * CONTROL_HZ * 100 / 1000000;
+    }
+private:
+    PwmOut pwm{PA_8};
+    static constexpr int CONTROL_HZ{5000};
 };
 
 class state_controller {
@@ -346,7 +407,9 @@ public:
         ac.init();
         bmu.init();
         temp.init();
+        fan.init();
         globalqueue.call_every(20ms, this, &state_controller::poll);
+        globalqueue.call_every(1s, this, &state_controller::poll_1s);
     }
 private:
     enum class POWER_STATE {
@@ -468,6 +531,52 @@ private:
         }
         state = newstate;
     }
+    void poll_1s() {
+        auto temperature = temp.get_temperature();
+        fan.control_by_temperature(temperature);
+        uint8_t buf[8]{0};
+        if (psw.get_raw_state())
+            buf[0] |= 0b00000001;
+        bool st0, st1, st2;
+        esw.get_raw_state(st0, st1);
+        if (st0)
+            buf[0] |= 0b00000010;
+        if (st1)
+            buf[0] |= 0b00000100;
+        bsw.get_raw_state(st0, st1);
+        if (st0)
+            buf[0] |= 0b00001000;
+        if (st1)
+            buf[0] |= 0b00010000;
+        if (mc.get_plugged())
+            buf[1] |= 0b00000001;
+        if (ac.get_docked())
+            buf[1] |= 0b00000010;
+        dcdc.get_failed_state(st0, st1);
+        if (st0)
+            buf[2] |= 0b00000001;
+        if (st1)
+            buf[2] |= 0b00000010;
+        bmu.get_fet_state(st0, st1, st2);
+        if (st0)
+            buf[2] |= 0b00010000;
+        if (st1)
+            buf[2] |= 0b00100000;
+        if (st2)
+            buf[2] |= 0b01000000;
+        wsw.get_raw_state(st0, st1);
+        if (st0)
+            buf[3] |= 0b00000001;
+        if (st1)
+            buf[3] |= 0b00000010;
+        int t0, t1;
+        ac.get_connector_temperature(t0, t1);
+        buf[4] = fan.get_duty_percent();
+        buf[5] = t0;
+        buf[6] = t1;
+        buf[7] = temperature;
+        can.send(CANMessage{1000, buf});
+    }
     I2C i2c{PB_7, PB_6};
     can_driver can;
     power_switch psw;
@@ -479,6 +588,7 @@ private:
     bmu_control bmu{can};
     temperature_sensor temp{i2c};
     dcdc_converter dcdc;
+    fan_driver fan;
     DigitalOut bat_out{PB_5, 0};
     POWER_STATE state{POWER_STATE::OFF};
     Timer timer_post, timer_shutdown;
