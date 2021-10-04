@@ -24,7 +24,7 @@ public:
             ++count;
         }
     }
-    bool call_callbacks(const CANMessage &msg) {
+    bool call_callbacks(const CANMessage &msg) const {
         for (int i = 0; i < count; ++i) {
             if (msg.id == callbacks[i].msgid && msg.len == callbacks[i].len) {
                 callbacks[i].func(msg);
@@ -151,7 +151,7 @@ public:
         heartbeat_timer.start();
         msg.init();
     }
-    bool get_docked() {
+    bool get_docked() const {
         return is_connected() && heartbeat_timer.elapsed_time() < 5s;
     }
     void set_enable(bool enable) {
@@ -169,7 +169,7 @@ public:
         serial.write(buf, sizeof buf);
 #endif
     }
-    bool get_connector_overheat() {
+    bool get_connector_overheat() const {
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
     }
     void poll() {
