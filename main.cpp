@@ -442,12 +442,12 @@ private:
         case POWER_STATE::DISCHARGE_LOW:
             LOG("enter DISCHARGE_LOW\n");
             dcdc.set_enable(true);
-            motor_out.write(0);
+            bat_out.write(0);
             ac.set_enable(false);
             break;
         case POWER_STATE::NORMAL:
             LOG("enter NORMAL\n");
-            motor_out.write(1);
+            bat_out.write(1);
             ac.set_enable(false);
             break;
         case POWER_STATE::AUTO_CHARGE:
@@ -456,7 +456,7 @@ private:
             break;
         case POWER_STATE::MANUAL_CHARGE:
             LOG("enter MANUAL_CHARGE\n");
-            motor_out.write(0);
+            bat_out.write(0);
             ac.set_enable(false);
             break;
         }
@@ -472,7 +472,7 @@ private:
     bmu_control bmu{can};
     temperature_sensor temp{i2c};
     dcdc_converter dcdc;
-    DigitalOut motor_out{PB_5, 0};
+    DigitalOut bat_out{PB_5, 0};
     POWER_STATE state{POWER_STATE::OFF};
     Timer timer_post, timer_shutdown;
     bool poweron_by_switch{false}, wait_shutdown{false};
