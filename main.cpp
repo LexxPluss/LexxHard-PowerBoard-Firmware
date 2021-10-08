@@ -408,7 +408,7 @@ public:
         temp.init();
         fan.init();
         globalqueue.call_every(20ms, this, &state_controller::poll);
-        globalqueue.call_every(1s, this, &state_controller::poll_1s);
+        globalqueue.call_every(100ms, this, &state_controller::poll_100ms);
     }
 private:
     enum class POWER_STATE {
@@ -530,7 +530,7 @@ private:
         }
         state = newstate;
     }
-    void poll_1s() {
+    void poll_100ms() {
         auto temperature = temp.get_temperature();
         fan.control_by_temperature(temperature);
         uint8_t buf[8]{0};
