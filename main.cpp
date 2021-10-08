@@ -228,8 +228,8 @@ private:
         adc_measure_mode = true;
     }
     void calculate_temperature(float adc_voltage) {
-        if (adc_voltage > 3.3f)
-            adc_voltage = 3.3f;
+        if (adc_voltage > 3.29999f)
+            adc_voltage = 3.29999f;
         if (adc_voltage < 0.0f)
             adc_voltage = 0.0f;
         // see https://lexxpluss.esa.io/posts/459
