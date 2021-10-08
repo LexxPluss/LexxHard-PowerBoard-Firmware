@@ -267,12 +267,12 @@ private:
     static constexpr int ADDR{0b10010000};
 };
 
-class bmu_control {
+class bmu_controller {
 public:
-    bmu_control(can_driver &can) : can(can) {}
+    bmu_controller(can_driver &can) : can(can) {}
     void init() {
         for (auto i : {0x100, 0x101, 0x113})
-            can.register_callback(i, callback(this, &bmu_control::handle_can));
+            can.register_callback(i, callback(this, &bmu_controller::handle_can));
     }
     void set_enable(bool enable) {main_sw = enable ? 1 : 0;}
     bool is_ok() const {
@@ -584,7 +584,7 @@ private:
     wheel_switch wsw;
     manual_charger mc;
     auto_charger ac{i2c};
-    bmu_control bmu{can};
+    bmu_controller bmu{can};
     temperature_sensor temp{i2c};
     dcdc_converter dcdc;
     fan_driver fan;
