@@ -16,17 +16,16 @@ EventQueue globalqueue;
 
 class can_callback {
 public:
-    void register_callback(uint32_t msgid, uint32_t len, Callback<void(const CANMessage &msg)> func) {
+    void register_callback(uint32_t msgid, Callback<void(const CANMessage &msg)> func) {
         if (count < NUM) {
             callbacks[count].msgid = msgid;
-            callbacks[count].len = len;
             callbacks[count].func = func;
             ++count;
         }
     }
     bool call_callbacks(const CANMessage &msg) const {
         for (int i = 0; i < count; ++i) {
-            if (msg.id == callbacks[i].msgid && msg.len == callbacks[i].len) {
+            if (msg.id == callbacks[i].msgid) {
                 callbacks[i].func(msg);
                 return true;
             }
@@ -37,7 +36,7 @@ private:
     int count{0};
     static const int NUM{8};
     struct {
-        uint32_t msgid, len;
+        uint32_t msgid;
         Callback<void(const CANMessage &msg)> func;
     } callbacks[NUM];
 };
@@ -52,9 +51,9 @@ public:
         if (can.read(msg) != 0 && msg.type == CANData)
             callback.call_callbacks(msg);
     }
-    void register_callback(uint32_t msgid, uint32_t len, Callback<void(const CANMessage &msg)> func) {
+    void register_callback(uint32_t msgid, Callback<void(const CANMessage &msg)> func) {
         can.filter(msgid, 0x000007ffu, CANStandard, filter_handle);
-        callback.register_callback(msgid, len, func);
+        callback.register_callback(msgid, func);
         filter_handle = (filter_handle + 1) % 14; // STM CAN filter size
     }
     void send(const CANMessage &msg) {
@@ -273,7 +272,7 @@ public:
     bmu_control(can_driver &can) : can(can) {}
     void init() {
         for (auto i : {0x100, 0x101, 0x113})
-            can.register_callback(i, 8, callback(this, &bmu_control::handle_can));
+            can.register_callback(i, callback(this, &bmu_control::handle_can));
     }
     void set_enable(bool enable) {main_sw = enable ? 1 : 0;}
     bool is_ok() const {
