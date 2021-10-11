@@ -233,7 +233,7 @@ private:
         if (adc_voltage < 0.0f)
             adc_voltage = 0.0f;
         // see https://lexxpluss.esa.io/posts/459
-        static constexpr float Rpu = 10000.0f, R0 = 3300.0f, B = 3970.0f, T0 = 373.0f;
+        static constexpr float Rpu = 27000.0f, R0 = 3300.0f, B = 3970.0f, T0 = 373.0f;
         float R = Rpu * adc_voltage / (3.3f - adc_voltage);
         float T = 1.0f / (logf(R / R0) / B + 1.0f / T0);
         connector_temp[adc_ch] = T - 273.0f;
