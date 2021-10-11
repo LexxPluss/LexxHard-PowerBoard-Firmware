@@ -407,6 +407,7 @@ public:
         fan.init();
         globalqueue.call_every(20ms, this, &state_controller::poll);
         globalqueue.call_every(100ms, this, &state_controller::poll_100ms);
+        globalqueue.call_every(1s, this, &state_controller::poll_1s);
     }
 private:
     enum class POWER_STATE {
@@ -574,6 +575,9 @@ private:
         buf[7] = temperature;
         can.send(CANMessage{1000, buf});
     }
+    void poll_1s() {
+        heartbeat_led = !heartbeat_led;
+    }
     I2C i2c{PB_7, PB_6};
     can_driver can;
     power_switch psw;
@@ -586,7 +590,7 @@ private:
     temperature_sensor temp{i2c};
     dcdc_converter dcdc;
     fan_driver fan;
-    DigitalOut bat_out{PB_5, 0};
+    DigitalOut bat_out{PB_5, 0}, heartbeat_led{PB_12, 0};
     POWER_STATE state{POWER_STATE::OFF};
     Timer timer_post, timer_shutdown;
     bool poweron_by_switch{false}, wait_shutdown{false};
