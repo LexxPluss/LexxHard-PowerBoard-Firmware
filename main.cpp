@@ -354,11 +354,9 @@ public:
     void set_enable(bool enable) {
         if (enable) {
             control[0].write(1); // 5V must be turned on first.
-            ThisThread::sleep_for(1ms);
             control[1].write(1);
         } else {
             control[1].write(0); // 16V must be turned off first.
-            ThisThread::sleep_for(1ms);
             control[0].write(0);
         }
     }
