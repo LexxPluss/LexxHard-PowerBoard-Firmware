@@ -205,7 +205,7 @@ private:
         buf[0] = 0b00000000; // Conversion Register
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
-            int16_t value = (buf[1] << 8) | buf[0];
+            int16_t value = (buf[0] << 8) | buf[1];
             float voltage = static_cast<float>(value) / 32768.0f * 4.096f;
             calculate_temperature(voltage);
         }
