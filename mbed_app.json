@@ -2,7 +2,8 @@
     "requres": ["bare-metal", "events"],
     "target_overrides": {
         "*": {
-           "target.c_lib": "small"
+           "target.c_lib": "small",
+           "platform.minimal-printf-enable-floating-point": true
         }
     }
 }
