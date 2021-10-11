@@ -264,7 +264,7 @@ private:
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
     int adc_ch{0};
     bool adc_measure_mode{false};
-    static constexpr int ADDR{0b10010000};
+    static constexpr int ADDR{0b10010010};
 };
 
 class bmu_controller {
