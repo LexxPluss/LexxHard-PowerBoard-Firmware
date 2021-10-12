@@ -483,9 +483,9 @@ private:
                     timer_shutdown.reset();
                     timer_shutdown.start();
                 }
-            }
-            if (!bsw.asserted() && !esw.asserted() && !trolley.is_collision())
+            } else if (!bsw.asserted() && !esw.asserted() && !trolley.is_collision()) {
                 set_new_state(POWER_STATE::NORMAL);
+            }
             break;
         }
         case POWER_STATE::NORMAL:
