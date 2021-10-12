@@ -104,25 +104,26 @@ private:
     int prev{-1};
 };
 
-class switch_base {
+class bumper_switch {
 public:
     bool asserted() {return left.read() == 0 || right.read() == 0;}
     void get_raw_state(bool &left, bool &right) {
         left = this->left.read() == 0;
         right = this->right.read() == 0;
     }
-protected:
-    switch_base(PinName left_pin, PinName right_pin) : left(left_pin), right(right_pin) {}
 private:
-    DigitalIn left, right;
+    DigitalIn left{PA_4}, right{PA_5};
 };
 
-struct bumper_switch : public switch_base {
-    bumper_switch() : switch_base(PA_4, PA_5) {}
-};
-
-struct emergency_switch : public switch_base {
-    emergency_switch() : switch_base(PA_6, PA_7) {}
+class emergency_switch {
+public:
+    bool asserted() {return left.read() == 1 || right.read() == 1;}
+    void get_raw_state(bool &left, bool &right) {
+        left = this->left.read() == 1;
+        right = this->right.read() == 1;
+    }
+private:
+    DigitalIn left{PA_6}, right{PA_7};
 };
 
 class wheel_switch {
