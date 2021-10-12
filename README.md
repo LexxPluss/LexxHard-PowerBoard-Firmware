@@ -25,9 +25,21 @@ $ brew install stlink
 
 ## Program
 
+バッテリー電源で書き込みを行う場合は、書き込み中に電源が切れないよう、電源スイッチを押したままの状態で書き込みを行う必要がある。
+
+### STLINK Tools (Open souce version)
+
 ```bash
 $ st-flash --connect-under-reset cmake_build/LEXXPLUSS_PB01/develop/GCC_ARM/mbed-os-powerboard.bin 0x8000000
 ```
+
+### STM32CubeProgrammer
+
+右側ST-LINKを選択して、PortはSWD、Reset modeはHardwaree reset、Connectで接続。
+左側はErasing & Programming画面を表示する。
+File pathで書き込みファイルを選ぶ、Start addressは0x08000000、Start Programmingで書き込み開始。
+
+![cubeprogrammer](docs/cubeprogrammer.png)
 
 ## Power Board CAN message
 
