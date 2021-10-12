@@ -363,7 +363,7 @@ public:
         }
     }
     bool is_ok() {
-        return fail[0].read() != 0 || fail[1].read() != 0;
+        return fail[0].read() != 0 && fail[1].read() != 0;
     }
     void get_failed_state(bool &v5, bool &v16) {
         v5 = fail[0].read() == 0;
