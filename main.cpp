@@ -98,7 +98,7 @@ public:
         return din.read() == 0;
     }
 private:
-    DigitalIn din{PB_0, PullUp};
+    DigitalIn din{PB_0};
     Timer timer;
     STATE state{STATE::RELEASED};
     int prev{-1};
@@ -112,7 +112,7 @@ public:
         right = this->right.read() == 0;
     }
 protected:
-    switch_base(PinName left_pin, PinName right_pin) : left(left_pin, PullUp), right(right_pin, PullUp) {}
+    switch_base(PinName left_pin, PinName right_pin) : left(left_pin), right(right_pin) {}
 private:
     DigitalIn left, right;
 };
@@ -148,7 +148,7 @@ class manual_charger {
 public:
     bool get_plugged() {return din.read() == 0;}
 private:
-    DigitalIn din{PB_10, PullUp};
+    DigitalIn din{PB_10};
 };
 
 class auto_charger {
