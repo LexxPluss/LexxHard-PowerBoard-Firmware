@@ -240,7 +240,8 @@ private:
         connector_temp[adc_ch] = T - 273.0f;
     }
     bool is_connected() const {
-        return connector_v > 1.0f;
+        static constexpr float connect_voltage = 3.3f * 1000.0f / (9100.0f + 1000.0f);
+        return connector_v > connect_voltage * 0.5f;
     }
     void poll_1s() {
         if (is_connected())
