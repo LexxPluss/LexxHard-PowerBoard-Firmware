@@ -117,8 +117,8 @@ private:
     DigitalIn left, right;
 };
 
-struct bumber_switch : public switch_base {
-    bumber_switch() : switch_base(PA_4, PA_5) {}
+struct bumper_switch : public switch_base {
+    bumper_switch() : switch_base(PA_4, PA_5) {}
 };
 
 struct emergency_switch : public switch_base {
@@ -611,7 +611,7 @@ private:
     I2C i2c{PB_7, PB_6};
     can_driver can;
     power_switch psw;
-    bumber_switch bsw;
+    bumper_switch bsw;
     emergency_switch esw;
     wheel_switch wsw;
     manual_charger mc;
