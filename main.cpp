@@ -381,7 +381,9 @@ public:
     }
     void control_by_temperature(float temperature) {
         int duty_percent;
-        if (temperature < 30.0f)
+        if (temperature < 15.0f)
+            duty_percent = 0;
+        else if (temperature < 30.0f)
             duty_percent = 10;
         else if (temperature > 50.0f)
             duty_percent = 100;
