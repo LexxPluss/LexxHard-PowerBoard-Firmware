@@ -293,6 +293,7 @@ private:
         switch (msg.id) {
         case 0x100:
             data.mod_status1 = msg.data[0];
+            // LOG("asoc:%u rsoc:%u soh:%u\n", msg.data[2], msg.data[3], msg.data[4]);
             break;
         case 0x101:
             data.mod_status2 = msg.data[6];
@@ -482,6 +483,7 @@ private:
                     if (timer_shutdown.elapsed_time() > 60s)
                         set_new_state(POWER_STATE::OFF);
                 } else {
+                    LOG("wait shutdown\n");
                     wait_shutdown = true;
                     timer_shutdown.reset();
                     timer_shutdown.start();
