@@ -147,6 +147,9 @@ private:
 
 class manual_charger {
 public:
+    void init() {
+        setup_first_state();
+    }
     void poll() {
         int now = din.read();
         if (prev != now) {
@@ -164,6 +167,15 @@ public:
     }
     bool is_plugged() {return plugged;}
 private:
+    void setup_first_state() {
+        int plugped_count{0};
+        for (int i = 0; i < 10; ++i) {
+            if (din.read() == 0)
+                ++plugped_count;
+            ThisThread::sleep_for(5ms);
+        }
+        plugged = plugped_count > 5;
+    }
     DigitalIn din{PB_10};
     Timer timer;
     int prev{1};
@@ -459,6 +471,7 @@ class state_controller {
 public:
     void init() {
         i2c.frequency(100000);
+        mc.init();
         ac.init();
         bmu.init();
         temp.init();
