@@ -147,9 +147,27 @@ private:
 
 class manual_charger {
 public:
-    bool is_plugged() {return din.read() == 0;}
+    void poll() {
+        int now = din.read();
+        if (prev != now) {
+            prev = now;
+            timer.reset();
+            timer.start();
+        } else {
+            auto elapsed = timer.elapsed_time();
+            if (elapsed > 100ms) {
+                plugged = now == 0;
+                timer.stop();
+                timer.reset();
+            }
+        }
+    }
+    bool is_plugged() {return plugged;}
 private:
     DigitalIn din{PB_10};
+    Timer timer;
+    int prev{1};
+    bool plugged{false};
 };
 
 class auto_charger {
@@ -454,6 +472,7 @@ private:
     void poll() {
         can.poll();
         psw.poll();
+        mc.poll();
         ac.poll();
         temp.poll();
         switch (state) {
