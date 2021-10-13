@@ -545,6 +545,7 @@ private:
         case POWER_STATE::OFF:
             LOG("enter OFF\n");
             poweron_by_switch = false;
+            dcdc.set_enable(false);
             bmu.set_enable(false);
             while (true) // wait power off
                 continue;
