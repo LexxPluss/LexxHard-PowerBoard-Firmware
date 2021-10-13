@@ -1,7 +1,7 @@
 # LexxPluss Power Board Software
 
 ## Install Mbed CLI 2 (mbed-tools).
-https://os.mbed.com/docs/mbed-os/v6.14/build-tools/install-or-upgrade.html
+https://os.mbed.com/docs/mbed-os/v6.15/build-tools/install-or-upgrade.html
 
 ## Install ARM embedded toolchain
 https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads
@@ -15,6 +15,23 @@ $ cd mbed-os-powerboard
 $ ln -s ../mbed-os-chargingboard/serial_message.hpp
 $ mbed-tools deploy
 $ mbed-tools compile -m LEXXPLUSS_PB01 -t GCC_ARM
+```
+
+> macOSでプラットフォーム以外のpython (pyenvとか) を使っている場合、cmakeがプラットフォームのpythonを使おうとして正常にビルドできない場合がある。
+> その場合はmbed-osに下記パッチを適用すると正常にビルドできるようになる。
+
+```diff
+diff --git a/tools/cmake/app.cmake b/tools/cmake/app.cmake
+index 9f62df8204..edc4d02fca 100644
+--- a/tools/cmake/app.cmake
++++ b/tools/cmake/app.cmake
+@@ -31,6 +31,7 @@ enable_language(C CXX ASM)
+ set(CMAKE_EXECUTABLE_SUFFIX .elf)
+ 
+ # Find Python
++set(CMAKE_FIND_FRAMEWORK NEVER)
+ find_package(Python3 COMPONENTS Interpreter)
+ include(CheckPythonPackage)
 ```
 
 ## Install STLINK Tools
