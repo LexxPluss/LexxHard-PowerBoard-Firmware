@@ -147,7 +147,7 @@ private:
 
 class manual_charger {
 public:
-    bool get_plugged() {return din.read() == 0;}
+    bool is_plugged() {return din.read() == 0;}
 private:
     DigitalIn din{PB_10};
 };
@@ -165,13 +165,13 @@ public:
         heartbeat_timer.start();
         msg.init();
     }
-    bool get_docked() const {
+    bool is_docked() const {
         return is_connected() && heartbeat_timer.elapsed_time() < 5s;
     }
     void set_enable(bool enable) {
         sw.write(enable ? 1 : 0);
     }
-    bool get_connector_overheat() const {
+    bool is_connector_overheat() const {
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
     }
     void get_connector_temperature(int &positive, int &negative) const {
@@ -458,7 +458,7 @@ private:
         temp.poll();
         switch (state) {
         case POWER_STATE::OFF:
-            set_new_state(mc.get_plugged() ? POWER_STATE::POST : POWER_STATE::WAIT_SW);
+            set_new_state(mc.is_plugged() ? POWER_STATE::POST : POWER_STATE::WAIT_SW);
             break;
         case POWER_STATE::WAIT_SW:
             if (psw.get_state() != power_switch::STATE::RELEASED) {
@@ -468,7 +468,7 @@ private:
             }
             break;
         case POWER_STATE::POST:
-            if (!poweron_by_switch && !mc.get_plugged())
+            if (!poweron_by_switch && !mc.is_plugged())
                 set_new_state(POWER_STATE::OFF);
             if (bmu.is_ok() && temp.is_ok())
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
@@ -498,16 +498,16 @@ private:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 bsw.asserted() || esw.asserted() || trolley.is_collision())
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
-            if (mc.get_plugged())
+            if (mc.is_plugged())
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
-            if (ac.get_docked())
+            if (ac.is_docked())
                 set_new_state(POWER_STATE::AUTO_CHARGE);
             break;
         case POWER_STATE::AUTO_CHARGE:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 bsw.asserted() || esw.asserted() || trolley.is_collision())
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
-            if (!ac.get_docked() || ac.get_connector_overheat())
+            if (!ac.is_docked() || ac.is_connector_overheat())
                 set_new_state(POWER_STATE::NORMAL);
             break;
         case POWER_STATE::MANUAL_CHARGE:
@@ -516,7 +516,7 @@ private:
             if (!bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 bsw.asserted() || esw.asserted() || trolley.is_collision())
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
-            if (!mc.get_plugged())
+            if (!mc.is_plugged())
                 set_new_state(POWER_STATE::NORMAL);
             break;
         }
@@ -582,9 +582,9 @@ private:
             buf[0] |= 0b00001000;
         if (st1)
             buf[0] |= 0b00010000;
-        if (mc.get_plugged())
+        if (mc.is_plugged())
             buf[1] |= 0b00000001;
-        if (ac.get_docked())
+        if (ac.is_docked())
             buf[1] |= 0b00000010;
         dcdc.get_failed_state(st0, st1);
         if (st0)
