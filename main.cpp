@@ -307,11 +307,19 @@ public:
         d_fet = this->d_fet.read() == 1;
         p_dsg = this->p_dsg.read() == 1;
     }
+    bool is_full_charge() const {
+        return (data.mod_status1 & 0b01000000) != 0;
+    }
+    bool is_chargable() const {
+        return (data.mod_status1 & 0b01000000) == 0 && data.rsoc < 95;
+    }
 private:
     void handle_can(const CANMessage &msg) {
         switch (msg.id) {
         case 0x100:
             data.mod_status1 = msg.data[0];
+            data.asoc = msg.data[2];
+            data.rsoc = msg.data[3];
             // LOG("asoc:%u rsoc:%u soh:%u\n", msg.data[2], msg.data[3], msg.data[4]);
             break;
         case 0x101:
@@ -328,6 +336,7 @@ private:
     DigitalIn c_fet{PB_14}, d_fet{PB_15}, p_dsg{PA_9};
     struct {
         uint8_t mod_status1{0xff}, mod_status2{0xff}, bmu_alarm1{0xff}, bmu_alarm2{0xff};
+        uint8_t asoc{0}, rsoc{0};
     } data;
 };
 
@@ -519,14 +528,14 @@ private:
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
             if (mc.is_plugged())
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
-            if (ac.is_docked())
+            if (ac.is_docked() && bmu.is_chargable())
                 set_new_state(POWER_STATE::AUTO_CHARGE);
             break;
         case POWER_STATE::AUTO_CHARGE:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 bsw.asserted() || esw.asserted() || trolley.is_collision())
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
-            if (!ac.is_docked() || ac.is_connector_overheat())
+            if (bmu.is_full_charge() || !ac.is_docked() || ac.is_connector_overheat())
                 set_new_state(POWER_STATE::NORMAL);
             break;
         case POWER_STATE::MANUAL_CHARGE:
