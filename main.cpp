@@ -199,10 +199,21 @@ public:
         return is_connected() && heartbeat_timer.elapsed_time() < 5s;
     }
     void set_enable(bool enable) {
-        sw.write(enable ? 1 : 0);
+        if (enable) {
+            sw.write(1);
+            voltage_timer.reset();
+            voltage_timer.start();
+        } else {
+            sw.write(0);
+            voltage_timer.stop();
+            voltage_timer.reset();
+        }
     }
     bool is_connector_overheat() const {
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
+    }
+    bool is_charger_stopped() const {
+        return voltage_timer.elapsed_time() > 10s;
     }
     void get_connector_temperature(int &positive, int &negative) const {
         positive = connector_temp[0];
@@ -210,6 +221,8 @@ public:
     }
     void poll() {
         connector_v = connector.read_voltage();
+        if (connector_v > CHARGING_VOLTAGE * 0.5f)
+            voltage_timer.reset();
 #ifndef DEBUG
         while (serial.readable()) {
             uint8_t data;
@@ -272,8 +285,7 @@ private:
         connector_temp[adc_ch] = T - 273.0f;
     }
     bool is_connected() const {
-        static constexpr float connect_voltage = 3.3f * 1000.0f / (9100.0f + 1000.0f);
-        return connector_v > connect_voltage * 0.5f;
+        return connector_v > CONNECT_VOLTAGE * 0.5f;
     }
     void poll_1s() {
         if (is_connected())
@@ -292,13 +304,15 @@ private:
 #endif
     AnalogIn connector{PB_1, 3.3f};
     DigitalOut sw{PB_2, 0};
-    Timer heartbeat_timer;
+    Timer heartbeat_timer, voltage_timer;
     serial_message msg;
     uint8_t heartbeat_counter{0};
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
     int adc_ch{0};
     bool adc_measure_mode{false};
     static constexpr int ADDR{0b10010010};
+    static constexpr float CHARGING_VOLTAGE = 30.0f * 1000.0f / (9100.0f + 1000.0f),
+                           CONNECT_VOLTAGE = 3.3f * 1000.0f / (9100.0f + 1000.0f);
 };
 
 class bmu_controller {
@@ -555,7 +569,7 @@ private:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 bsw.asserted() || esw.asserted() || trolley.is_collision())
                 set_new_state(POWER_STATE::DISCHARGE_LOW);
-            if (bmu.is_full_charge() || !ac.is_docked() || ac.is_connector_overheat())
+            if (bmu.is_full_charge() || ac.is_charger_stopped() || !ac.is_docked() || ac.is_connector_overheat())
                 set_new_state(POWER_STATE::NORMAL);
             break;
         case POWER_STATE::MANUAL_CHARGE:
