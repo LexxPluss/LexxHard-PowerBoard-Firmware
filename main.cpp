@@ -580,6 +580,7 @@ private:
         case POWER_STATE::POST:
             LOG("enter POST\n");
             bmu.set_enable(true);
+            bat_out.write(0);
             timer_post.reset();
             timer_post.start();
             break;
@@ -587,7 +588,7 @@ private:
             LOG("enter STANDBY\n");
             dcdc.set_enable(true);
             wsw.set_disable(true);
-            bat_out.write(0);
+            bat_out.write(1);
             ac.set_enable(false);
             wait_shutdown = false;
             break;
