@@ -507,7 +507,7 @@ private:
         OFF,
         WAIT_SW,
         POST,
-        DISCHARGE_LOW,
+        STANDBY,
         NORMAL,
         AUTO_CHARGE,
         MANUAL_CHARGE,
@@ -533,11 +533,11 @@ private:
             if (!poweron_by_switch && !mc.is_plugged())
                 set_new_state(POWER_STATE::OFF);
             if (bmu.is_ok() && temp.is_ok())
-                set_new_state(POWER_STATE::DISCHARGE_LOW);
+                set_new_state(POWER_STATE::STANDBY);
             else if (timer_post.elapsed_time() > 3s)
                 set_new_state(POWER_STATE::OFF);
             break;
-        case POWER_STATE::DISCHARGE_LOW: {
+        case POWER_STATE::STANDBY: {
             auto psw_state = psw.get_state();
             if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED)
                 set_new_state(POWER_STATE::OFF);
@@ -559,7 +559,7 @@ private:
         case POWER_STATE::NORMAL:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 bsw.asserted() || esw.asserted() || trolley.is_collision())
-                set_new_state(POWER_STATE::DISCHARGE_LOW);
+                set_new_state(POWER_STATE::STANDBY);
             if (mc.is_plugged())
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
             if (ac.is_docked() && bmu.is_chargable())
@@ -568,7 +568,7 @@ private:
         case POWER_STATE::AUTO_CHARGE:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 bsw.asserted() || esw.asserted() || trolley.is_collision())
-                set_new_state(POWER_STATE::DISCHARGE_LOW);
+                set_new_state(POWER_STATE::STANDBY);
             if (bmu.is_full_charge() || ac.is_charger_stopped() || !ac.is_docked() || ac.is_connector_overheat())
                 set_new_state(POWER_STATE::NORMAL);
             break;
@@ -577,7 +577,7 @@ private:
                 psw.reset_state();
             if (!bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 bsw.asserted() || esw.asserted() || trolley.is_collision())
-                set_new_state(POWER_STATE::DISCHARGE_LOW);
+                set_new_state(POWER_STATE::STANDBY);
             if (!mc.is_plugged())
                 set_new_state(POWER_STATE::NORMAL);
             break;
@@ -602,8 +602,8 @@ private:
             timer_post.reset();
             timer_post.start();
             break;
-        case POWER_STATE::DISCHARGE_LOW:
-            LOG("enter DISCHARGE_LOW\n");
+        case POWER_STATE::STANDBY:
+            LOG("enter STANDBY\n");
             dcdc.set_enable(true);
             wsw.set_disable(true);
             bat_out.write(0);
