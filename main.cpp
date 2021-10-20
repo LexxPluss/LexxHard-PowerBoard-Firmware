@@ -594,6 +594,7 @@ private:
             wsw.set_disable(true);
             bat_out.write(0);
             ac.set_enable(false);
+            wait_shutdown = false;
             break;
         case POWER_STATE::NORMAL:
             LOG("enter NORMAL\n");
