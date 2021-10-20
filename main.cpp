@@ -200,7 +200,7 @@ public:
 #endif
         globalqueue.call_every(1s, this, &auto_charger::poll_1s);
         heartbeat_timer.start();
-        msg.init();
+        serial_timer.start();
     }
     bool is_docked() const {
         return is_connected() && heartbeat_timer.elapsed_time() < 5s;
@@ -232,6 +232,9 @@ public:
             voltage_timer.reset();
 #ifndef DEBUG
         while (serial.readable()) {
+            if (serial_timer.elapsed_time() > 1s)
+                msg.reset();
+            serial_timer.reset();
             uint8_t data;
             serial.read(&data, 1);
             if (msg.decode(data)) {
@@ -311,7 +314,7 @@ private:
 #endif
     AnalogIn connector{PB_1, 3.3f};
     DigitalOut sw{PB_2, 0};
-    Timer heartbeat_timer, voltage_timer;
+    Timer heartbeat_timer, voltage_timer, serial_timer;
     serial_message msg;
     uint8_t heartbeat_counter{0};
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};

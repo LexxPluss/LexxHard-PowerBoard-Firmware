@@ -1,22 +1,11 @@
 #pragma once
 
-#include "mbed.h"
-
 class serial_message {
 public:
-    void init() {
-        timer.start();
-    }
     bool decode(uint8_t data) {
-        if (timer.elapsed_time() > 1s)
-            reset();
-        timer.reset();
         return decode_single(data);
     }
     bool decode(uint8_t *buf, int length) {
-        if (timer.elapsed_time() > 1s)
-            reset();
-        timer.reset();
         while (length--) {
             if (decode_single(*buf++))
                 return true;
@@ -40,17 +29,15 @@ public:
         } else {
             buf[3] = buf[4] = buf[5] = 0;
         }
-        MbedCRC<POLY_16BIT_CCITT, 16> ct{0, 0, false, false};
-        uint32_t crc{0};
-        ct.compute(buf, 6, &crc);
-        buf[6] = crc;
-        buf[7] = crc >> 8;
+        uint16_t sum = calc_check_sum(buf, 6);
+        buf[6] = sum;
+        buf[7] = sum >> 8;
     }
+    void reset() {state = STATE::HEAD0;}
     static constexpr uint8_t HEARTBEAT = 0x01;
     static constexpr uint8_t POWERON = 0x02;
     static constexpr uint8_t POWEROFF = 0x03;
 private:
-    void reset() {state = STATE::HEAD0;}
     bool decode_single(uint8_t data) {
         bool result{false};
         switch (state) {
@@ -72,18 +59,23 @@ private:
             request.raw[data_count] = data;
             if (++data_count >= sizeof request.raw) {
                 reset();
-                MbedCRC<POLY_16BIT_CCITT, 16> ct{0, 0, false, false};
-                uint32_t crc{0};
-                ct.compute(request.raw, 6, &crc);
-                if (((crc >> 0) & 0xff) == request.detail.sum[0] &&
-                    ((crc >> 8) & 0xff) == request.detail.sum[1])
+                uint16_t sum = calc_check_sum(request.raw, 6);
+                if (((sum >> 0) & 0xff) == request.detail.sum[0] &&
+                    ((sum >> 8) & 0xff) == request.detail.sum[1])
                     result = true;
             }
             break;
         }
         return result;
     }
-    Timer timer;
+    static uint16_t calc_check_sum(const uint8_t *buf, uint32_t length) {
+        uint16_t value{0};
+        while (length--)
+            value += *buf++;
+        uint8_t l{static_cast<uint8_t>(255 - value % 256)};
+        uint8_t h{static_cast<uint8_t>(~l)};
+        return (h << 8) | l;
+    }
     union {
         uint8_t raw[8];
         struct {
