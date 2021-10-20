@@ -226,10 +226,14 @@ public:
     }
 private:
     void adc_ticktock() {
-        if (adc_measure_mode)
+        if (adc_measure_mode) {
             adc_read();
-        else
+            adc_ch = adc_ch == 0 ? 1 : 0;
+            adc_measure_mode = false;
+        } else {
             adc_measure();
+            adc_measure_mode = true;
+        }
     }
     void adc_read() {
         uint8_t buf[2];
@@ -240,10 +244,8 @@ private:
             float voltage = static_cast<float>(value) / 32768.0f * 4.096f;
             calculate_temperature(voltage);
         }
-        adc_ch = adc_ch == 0 ? 1 : 0;
-        adc_measure_mode = false;
     }
-    void adc_measure() {
+    void adc_measure() const {
         uint8_t buf[3];
         buf[0] = 0b00000001; // Config Register
         buf[1] = 0b10000011; // Start, FSR4.096V, Single
@@ -256,7 +258,6 @@ private:
         case 3: buf[1] |= 0b01110000; break;
         }
         i2c.write(ADDR, reinterpret_cast<const char*>(buf), sizeof buf);
-        adc_measure_mode = true;
     }
     void calculate_temperature(float adc_voltage) {
         if (adc_voltage > 3.29999f)
