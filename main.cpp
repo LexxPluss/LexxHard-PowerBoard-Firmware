@@ -106,13 +106,20 @@ private:
 
 class bumper_switch {
 public:
-    bool asserted() {return left.read() == 0 || right.read() == 0;}
-    void get_raw_state(bool &left, bool &right) {
-        left = this->left.read() == 0;
-        right = this->right.read() == 0;
+    void poll() {
+        if (left.read() == 0 || right.read() == 0) {
+            asserted = true;
+            timeout.attach(callback(this, &bumper_switch::assert_timeout), 1s);
+        }
+    }
+    void get_raw_state(bool &left, bool &right) const {
+        left = right = asserted;
     }
 private:
+    void assert_timeout() {asserted = false;}
     DigitalIn left{PA_4}, right{PA_5};
+    Timeout timeout;
+    bool asserted{false};
 };
 
 class emergency_switch {
@@ -491,6 +498,7 @@ private:
     void poll() {
         can.poll();
         psw.poll();
+        bsw.poll();
         mc.poll();
         ac.poll();
         temp.poll();
@@ -527,14 +535,13 @@ private:
                     timer_shutdown.reset();
                     timer_shutdown.start();
                 }
-            } else if (!esw.asserted() && !esw.asserted()) {
+            } else if (!esw.asserted()) {
                 set_new_state(POWER_STATE::NORMAL);
             }
             break;
         }
         case POWER_STATE::NORMAL:
-            if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
-                bsw.asserted() || esw.asserted())
+            if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() || esw.asserted())
                 set_new_state(POWER_STATE::STANDBY);
             if (mc.is_plugged())
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
@@ -542,8 +549,7 @@ private:
                 set_new_state(POWER_STATE::AUTO_CHARGE);
             break;
         case POWER_STATE::AUTO_CHARGE:
-            if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
-                bsw.asserted() || esw.asserted())
+            if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() || esw.asserted())
                 set_new_state(POWER_STATE::STANDBY);
             if (bmu.is_full_charge() || ac.is_charger_stopped() || !ac.is_docked() || ac.is_connector_overheat())
                 set_new_state(POWER_STATE::NORMAL);
@@ -551,8 +557,7 @@ private:
         case POWER_STATE::MANUAL_CHARGE:
             if (psw.get_state() != power_switch::STATE::RELEASED)
                 psw.reset_state();
-            if (!bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
-                bsw.asserted() || esw.asserted())
+            if (!bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() || esw.asserted())
                 set_new_state(POWER_STATE::STANDBY);
             if (!mc.is_plugged())
                 set_new_state(POWER_STATE::NORMAL);
