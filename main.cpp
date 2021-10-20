@@ -332,10 +332,16 @@ private:
             data.mod_status1 = msg.data[0];
             data.asoc = msg.data[2];
             data.rsoc = msg.data[3];
-            // LOG("asoc:%u rsoc:%u soh:%u\n", msg.data[2], msg.data[3], msg.data[4]);
+            // LOG("asoc:%u rsoc:%u soh:%u st:0x%02x\n", msg.data[2], msg.data[3], msg.data[4], msg.data[0]);
             break;
         case 0x101:
             data.mod_status2 = msg.data[6];
+            {
+                int16_t pack_a = (msg.data[0]) << 8 | msg.data[1];
+                uint16_t charge_a = (msg.data[2]) << 8 | msg.data[3];
+                uint16_t pack_v = (msg.data[4]) << 8 | msg.data[5];
+                // LOG("pack_a:%d charge_a:%u v:%u\n", pack_a, charge_a, pack_v);
+            }
             break;
         case 0x113:
             data.bmu_alarm1 = msg.data[4];
