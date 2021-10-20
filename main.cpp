@@ -465,31 +465,6 @@ private:
     static constexpr int CONTROL_HZ{5000};
 };
 
-class trolley_controller {
-public:
-    trolley_controller(can_driver &can) : can(can) {}
-    void init() {
-        can.register_callback(1001, callback(this, &trolley_controller::handle_can));
-    }
-    enum class STATE {
-        DISCONNECT,
-        CONNECT,
-        COLLISION,
-    };
-    bool is_collision() const {return state == STATE::COLLISION;}
-private:
-    void handle_can(const CANMessage &msg) {
-        switch (msg.data[0]) {
-        default:
-        case 0: state = STATE::DISCONNECT; break;
-        case 1: state = STATE::CONNECT; break;
-        case 2: state = STATE::COLLISION; break;
-        }
-    }
-    can_driver &can;
-    STATE state{STATE::DISCONNECT};
-};
-
 class state_controller {
 public:
     void init() {
@@ -499,7 +474,6 @@ public:
         bmu.init();
         temp.init();
         fan.init();
-        trolley.init();
         globalqueue.call_every(20ms, this, &state_controller::poll);
         globalqueue.call_every(100ms, this, &state_controller::poll_100ms);
         globalqueue.call_every(1s, this, &state_controller::poll_1s);
@@ -553,14 +527,14 @@ private:
                     timer_shutdown.reset();
                     timer_shutdown.start();
                 }
-            } else if (!bsw.asserted() && !esw.asserted() && !trolley.is_collision()) {
+            } else if (!esw.asserted() && !esw.asserted()) {
                 set_new_state(POWER_STATE::NORMAL);
             }
             break;
         }
         case POWER_STATE::NORMAL:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
-                bsw.asserted() || esw.asserted() || trolley.is_collision())
+                bsw.asserted() || esw.asserted())
                 set_new_state(POWER_STATE::STANDBY);
             if (mc.is_plugged())
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
@@ -569,7 +543,7 @@ private:
             break;
         case POWER_STATE::AUTO_CHARGE:
             if (psw.get_state() != power_switch::STATE::RELEASED || !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
-                bsw.asserted() || esw.asserted() || trolley.is_collision())
+                bsw.asserted() || esw.asserted())
                 set_new_state(POWER_STATE::STANDBY);
             if (bmu.is_full_charge() || ac.is_charger_stopped() || !ac.is_docked() || ac.is_connector_overheat())
                 set_new_state(POWER_STATE::NORMAL);
@@ -578,7 +552,7 @@ private:
             if (psw.get_state() != power_switch::STATE::RELEASED)
                 psw.reset_state();
             if (!bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
-                bsw.asserted() || esw.asserted() || trolley.is_collision())
+                bsw.asserted() || esw.asserted())
                 set_new_state(POWER_STATE::STANDBY);
             if (!mc.is_plugged())
                 set_new_state(POWER_STATE::NORMAL);
@@ -692,7 +666,6 @@ private:
     temperature_sensor temp{i2c};
     dcdc_converter dcdc;
     fan_driver fan;
-    trolley_controller trolley{can};
     DigitalOut bat_out{PB_5, 0}, heartbeat_led{PB_12, 0};
     POWER_STATE state{POWER_STATE::OFF};
     Timer timer_post, timer_shutdown;
