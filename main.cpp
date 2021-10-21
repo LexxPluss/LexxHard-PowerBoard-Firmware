@@ -462,15 +462,18 @@ public:
         pwm.pulsewidth_us(0);
     }
     void control_by_temperature(float temperature) {
+        static constexpr float temp_min{15.0f}, temp_l{30.0f}, temp_h{50.0f};
+        static constexpr int duty_l{10}, duty_h{100};
+        static constexpr float A{(duty_h - duty_l) / (temp_h - temp_l)};
         int duty_percent;
-        if (temperature < 15.0f)
+        if (temperature < temp_min)
             duty_percent = 0;
-        else if (temperature < 30.0f)
-            duty_percent = 10;
-        else if (temperature > 50.0f)
-            duty_percent = 100;
+        else if (temperature < temp_l)
+            duty_percent = duty_l;
+        else if (temperature > temp_h)
+            duty_percent = duty_h;
         else
-            duty_percent = temperature * 4.5f - 125.0f; // Linearly interpolate between 30degC and 50degC.
+            duty_percent = A * (temperature - temp_l) + duty_l; // Linearly interpolate between temp_l and temp_h.
         int pulsewidth{duty_percent * 1000000 / 100 / CONTROL_HZ};
         pwm.pulsewidth_us(pulsewidth);
     }
