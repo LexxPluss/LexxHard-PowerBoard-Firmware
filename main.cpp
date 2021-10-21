@@ -114,6 +114,13 @@ public:
     }
     void get_raw_state(bool &left, bool &right) const {
         left = right = asserted;
+#ifdef DEBUG
+        static bool prev{false};
+        if (prev != asserted) {
+            prev = asserted;
+            LOG("BUMPER %s!\n", asserted ? "ON" : "OFF");
+        }
+#endif
     }
 private:
     void assert_timeout() {asserted = false;}
