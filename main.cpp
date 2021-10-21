@@ -535,6 +535,7 @@ private:
                 } else {
                     LOG("wait shutdown\n");
                     wait_shutdown = true;
+                    bat_out.write(0);
                     timer_shutdown.reset();
                     timer_shutdown.start();
                 }
@@ -574,6 +575,7 @@ private:
             poweron_by_switch = false;
             dcdc.set_enable(false);
             bmu.set_enable(false);
+            bat_out.write(0);
             while (true) // wait power off
                 continue;
             break;
