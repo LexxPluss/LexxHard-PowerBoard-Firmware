@@ -6,7 +6,7 @@ namespace {
 #undef DEBUG
 #ifdef DEBUG
 BufferedSerial debugserial{PA_2, PA_3};
-FILE *debugout = fdopen(&debugserial, "r+");
+FILE *debugout{fdopen(&debugserial, "r+")};
 #define LOG(...) fprintf(debugout, __VA_ARGS__)
 #else
 #define LOG(...) [](){}() // lambda empty function
@@ -24,7 +24,7 @@ public:
         }
     }
     bool call_callbacks(const CANMessage &msg) const {
-        for (int i = 0; i < count; ++i) {
+        for (int i{0}; i < count; ++i) {
             if (msg.id == callbacks[i].msgid) {
                 callbacks[i].func(msg);
                 return true;
@@ -71,14 +71,14 @@ public:
         RELEASED, PUSHED, LONG_PUSHED,
     };
     void poll() {
-        int now = din.read();
+        int now{din.read()};
         if (prev != now) {
             LOG("power_switch change to %d\n", now);
             prev = now;
             timer.reset();
             timer.start();
         } else if (now == 0) {
-            auto elapsed = timer.elapsed_time();
+            auto elapsed{timer.elapsed_time()};
             if (elapsed > 10s) {
                 if (state != STATE::LONG_PUSHED)
                     state = STATE::LONG_PUSHED;
@@ -165,13 +165,13 @@ public:
         setup_first_state();
     }
     void poll() {
-        int now = din.read();
+        int now{din.read()};
         if (prev != now) {
             prev = now;
             timer.reset();
             timer.start();
         } else {
-            auto elapsed = timer.elapsed_time();
+            auto elapsed{timer.elapsed_time()};
             if (elapsed > 100ms) {
                 plugged = now == 0;
                 timer.stop();
@@ -183,7 +183,7 @@ public:
 private:
     void setup_first_state() {
         int plugped_count{0};
-        for (int i = 0; i < 10; ++i) {
+        for (int i{0}; i < 10; ++i) {
             if (din.read() == 0)
                 ++plugped_count;
             ThisThread::sleep_for(5ms);
@@ -246,7 +246,7 @@ public:
             serial.read(&data, 1);
             if (msg.decode(data)) {
                 uint8_t param[3];
-                uint8_t command = msg.get_command(param);
+                uint8_t command{msg.get_command(param)};
                 if (command == serial_message::HEARTBEAT && param[0] == heartbeat_counter)
                     heartbeat_timer.reset();
             }
@@ -270,8 +270,8 @@ private:
         buf[0] = 0b00000000; // Conversion Register
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
-            int16_t value = (buf[0] << 8) | buf[1];
-            float voltage = static_cast<float>(value) / 32768.0f * 4.096f;
+            int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
+            float voltage{static_cast<float>(value) / 32768.0f * 4.096f};
             calculate_temperature(voltage);
         }
     }
@@ -295,10 +295,10 @@ private:
         if (adc_voltage < 0.0f)
             adc_voltage = 0.0f;
         // see https://lexxpluss.esa.io/posts/459
-        static constexpr float R0 = 3300.0f, B = 3970.0f, T0 = 373.0f;
-        float Rpu = adc_ch < 2 ? 27000.0f : 10000.0f;
-        float R = Rpu * adc_voltage / (3.3f - adc_voltage);
-        float T = 1.0f / (logf(R / R0) / B + 1.0f / T0);
+        static constexpr float R0{3300.0f}, B{70.0f}, T0{373.0f};
+        float Rpu{adc_ch < 2 ? 27000.0f : 10000.0f};
+        float R{Rpu * adc_voltage / (3.3f - adc_voltage)};
+        float T{1.0f / (logf(R / R0) / B + 1.0f / T0)};
         connector_temp[adc_ch] = T - 273.0f;
     }
     bool is_connected() const {
@@ -328,8 +328,8 @@ private:
     int adc_ch{0};
     bool adc_measure_mode{false};
     static constexpr int ADDR{0b10010010};
-    static constexpr float CHARGING_VOLTAGE = 30.0f * 1000.0f / (9100.0f + 1000.0f),
-                           CONNECT_VOLTAGE = 3.3f * 1000.0f / (9100.0f + 1000.0f);
+    static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
+                           CONNECT_VOLTAGE{3.3f * 1000.0f / (9100.0f + 1000.0f)};
 };
 
 class bmu_controller {
@@ -370,9 +370,9 @@ private:
             data.mod_status2 = msg.data[6];
 #if 0
             {
-                int16_t pack_a = (msg.data[0]) << 8 | msg.data[1];
-                uint16_t charge_a = (msg.data[2]) << 8 | msg.data[3];
-                uint16_t pack_v = (msg.data[4]) << 8 | msg.data[5];
+                int16_t pack_a{(msg.data[0]) << 8 | msg.data[1]};
+                uint16_t charge_a{(msg.data[2]) << 8 | msg.data[3]};
+                uint16_t pack_v{(msg.data[4]) << 8 | msg.data[5]};
                 LOG("pack_a:%d charge_a:%u v:%u\n", pack_a, charge_a, pack_v);
             }
 #endif
@@ -422,7 +422,7 @@ public:
         buf[0] = 0x00; // Temperature Value MSB Register
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
-            int16_t value = (buf[0] << 8) | buf[1];
+            int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
             temperature = value / 128.0f;
         }
     }
@@ -471,7 +471,7 @@ public:
             duty_percent = 100;
         else
             duty_percent = temperature * 4.5f - 125.0f; // Linearly interpolate between 30degC and 50degC.
-        int pulsewidth = duty_percent * 1000000 / 100 / CONTROL_HZ;
+        int pulsewidth{duty_percent * 1000000 / 100 / CONTROL_HZ};
         pwm.pulsewidth_us(pulsewidth);
     }
     int get_duty_percent() {
@@ -532,7 +532,7 @@ private:
                 set_new_state(POWER_STATE::OFF);
             break;
         case POWER_STATE::STANDBY: {
-            auto psw_state = psw.get_state();
+            auto psw_state{psw.get_state()};
             if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED)
                 set_new_state(POWER_STATE::OFF);
             if (psw_state == power_switch::STATE::PUSHED || !bmu.is_ok() || !temp.is_ok()) {
@@ -624,7 +624,7 @@ private:
         state = newstate;
     }
     void poll_100ms() {
-        auto temperature = temp.get_temperature();
+        auto temperature{temp.get_temperature()};
         fan.control_by_temperature(temperature);
         uint8_t buf[8]{0};
         if (psw.get_raw_state())
