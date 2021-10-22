@@ -571,8 +571,6 @@ private:
         case POWER_STATE::MANUAL_CHARGE:
             if (psw.get_state() != power_switch::STATE::RELEASED)
                 psw.reset_state();
-            if (!bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() || esw.asserted())
-                set_new_state(POWER_STATE::STANDBY);
             if (!mc.is_plugged())
                 set_new_state(POWER_STATE::NORMAL);
             break;
