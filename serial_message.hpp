@@ -29,14 +29,14 @@ public:
         } else {
             buf[3] = buf[4] = buf[5] = 0;
         }
-        uint16_t sum = calc_check_sum(buf, 6);
+        uint16_t sum{calc_check_sum(buf, 6)};
         buf[6] = sum;
         buf[7] = sum >> 8;
     }
     void reset() {state = STATE::HEAD0;}
-    static constexpr uint8_t HEARTBEAT = 0x01;
-    static constexpr uint8_t POWERON = 0x02;
-    static constexpr uint8_t POWEROFF = 0x03;
+    static constexpr uint8_t HEARTBEAT{0x01};
+    static constexpr uint8_t POWERON{0x02};
+    static constexpr uint8_t POWEROFF{0x03};
 private:
     bool decode_single(uint8_t data) {
         bool result{false};
@@ -59,7 +59,7 @@ private:
             request.raw[data_count] = data;
             if (++data_count >= sizeof request.raw) {
                 reset();
-                uint16_t sum = calc_check_sum(request.raw, 6);
+                uint16_t sum{calc_check_sum(request.raw, 6)};
                 if (((sum >> 0) & 0xff) == request.detail.sum[0] &&
                     ((sum >> 8) & 0xff) == request.detail.sum[1])
                     result = true;
