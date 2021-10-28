@@ -489,11 +489,11 @@ class mainboard_controller {
 public:
     mainboard_controller(can_driver &can) : can(can) {}
     void init() {
-        can.register_callback(1001, callback(this, &mainboard_controller::handle_can));
+        can.register_callback(0x201, callback(this, &mainboard_controller::handle_can));
     }
     void poll() {
         if (timer.elapsed_time() > 1s) {
-            no_heartbeat = true;
+            heartbeat_timeout = true;
             timer.stop();
             timer.reset();
         }
@@ -505,20 +505,28 @@ public:
         return power_off;
     }
     bool is_dead() const {
-        return no_heartbeat || no_ros_heartbeat;
+        if (heartbeat_detect)
+            return heartbeat_timeout || ros_heartbeat_timeout;
+        else
+            return false;
+    }
+    bool is_ready() const {
+        return heartbeat_detect;
     }
 private:
     void handle_can(const CANMessage &msg) {
-        no_heartbeat = false;
+        heartbeat_timeout = false;
         timer.reset();
         timer.start();
         emergency_stop = msg.data[0] != 0;
         power_off = msg.data[1] != 0;
-        no_ros_heartbeat = msg.data[2] != 0;
+        ros_heartbeat_timeout = msg.data[2] != 0;
+        if (!ros_heartbeat_timeout)
+            heartbeat_detect = true;
     }
     can_driver &can;
     Timer timer;
-    bool no_heartbeat{false}, no_ros_heartbeat{false}, emergency_stop{false}, power_off{false};
+    bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false};
 };
 
 class state_controller {
@@ -588,7 +596,7 @@ private:
                     timer_shutdown.reset();
                     timer_shutdown.start();
                 }
-            } else if (!esw.asserted() && !mbd.emergency_stop_from_ros()) {
+            } else if (!esw.asserted() && !mbd.emergency_stop_from_ros() && mbd.is_ready()) {
                 set_new_state(POWER_STATE::NORMAL);
             }
             break;
@@ -711,7 +719,7 @@ private:
         buf[5] = t0;
         buf[6] = t1;
         buf[7] = temperature;
-        can.send(CANMessage{1000, buf});
+        can.send(CANMessage{0x200, buf});
     }
     void poll_1s() {
         heartbeat_led = !heartbeat_led;
