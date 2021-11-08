@@ -71,7 +71,7 @@ public:
         RELEASED, PUSHED, LONG_PUSHED,
     };
     void poll() {
-        int now{din.read()};
+        int now{sw.read()};
         if (prev != now) {
             LOG("power_switch change to %d\n", now);
             prev = now;
@@ -95,10 +95,14 @@ public:
     }
     STATE get_state() const {return state;}
     bool get_raw_state() {
-        return din.read() == 0;
+        return sw.read() == 0;
+    }
+    void set_led(bool enabled) {
+        led.write(enabled ? 1 : 0);
     }
 private:
-    DigitalIn din{PB_0};
+    DigitalIn sw{PB_0};
+    DigitalOut led{PB_13, 0};
     Timer timer;
     STATE state{STATE::RELEASED};
     int prev{-1};
@@ -632,6 +636,7 @@ private:
         case POWER_STATE::OFF:
             LOG("enter OFF\n");
             poweron_by_switch = false;
+            psw.set_led(false);
             dcdc.set_enable(false);
             bmu.set_enable(false);
             bat_out.write(0);
@@ -643,6 +648,7 @@ private:
             break;
         case POWER_STATE::POST:
             LOG("enter POST\n");
+            psw.set_led(true);
             bmu.set_enable(true);
             bat_out.write(0);
             timer_post.reset();
