@@ -9,7 +9,7 @@ BufferedSerial debugserial{PA_2, PA_3};
 FILE *debugout{fdopen(&debugserial, "r+")};
 #define LOG(...) fprintf(debugout, __VA_ARGS__)
 #else
-#define LOG(...) [](){}() // lambda empty function
+#define LOG(...) logger.print(__VA_ARGS__)
 #endif
 
 EventQueue globalqueue;
@@ -64,6 +64,30 @@ private:
     can_callback callback;
     int filter_handle{0};
 };
+
+class log_printer {
+public:
+    void set_can_driver(can_driver *can) {
+        this->can = can;
+    }
+    void print(const char *fmt, ...) {
+        if (can == nullptr)
+            return;
+        va_list arg;
+        va_start(arg, fmt);
+        int n{vsnprintf(buffer, sizeof buffer, fmt, arg)};
+        va_end(arg);
+        for (int i{0}; i < n; i += 8) {
+            uint8_t buf[8];
+            memcpy(buf, &buffer[i], sizeof buf);
+            can->send(CANMessage{0x300, buf});
+            ThisThread::sleep_for(1ms);
+        }
+    }
+private:
+    can_driver *can{nullptr};
+    char buffer[128];
+} logger;
 
 class power_switch {
 public:
@@ -543,6 +567,7 @@ public:
         temp.init();
         fan.init();
         mbd.init();
+        logger.set_can_driver(&can);
         globalqueue.call_every(20ms, this, &state_controller::poll);
         globalqueue.call_every(100ms, this, &state_controller::poll_100ms);
         globalqueue.call_every(1s, this, &state_controller::poll_1s);
