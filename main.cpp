@@ -137,7 +137,7 @@ public:
     void poll() {
         if (left.read() == 0 || right.read() == 0) {
             asserted = true;
-            timeout.attach(callback(this, &bumper_switch::assert_timeout), 1s);
+            timeout.attach([this](){asserted = false;}, 1s);
         }
     }
     void get_raw_state(bool &left, bool &right) const {
@@ -151,7 +151,6 @@ public:
 #endif
     }
 private:
-    void assert_timeout() {asserted = false;}
     DigitalIn left{PA_4}, right{PA_5};
     Timeout timeout;
     bool asserted{false};
