@@ -240,21 +240,10 @@ public:
         return is_connected() && heartbeat_timer.elapsed_time() < 5s;
     }
     void set_enable(bool enable) {
-        if (enable) {
-            sw.write(1);
-            voltage_timer.reset();
-            voltage_timer.start();
-        } else {
-            sw.write(0);
-            voltage_timer.stop();
-            voltage_timer.reset();
-        }
+        sw.write(enable ? 1 : 0);
     }
     bool is_connector_overheat() const {
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
-    }
-    bool is_charger_stopped() const {
-        return voltage_timer.elapsed_time() > 10s;
     }
     void get_connector_temperature(int &positive, int &negative) const {
         positive = connector_temp[0];
@@ -262,8 +251,12 @@ public:
     }
     void poll() {
         connector_v = connector.read_voltage();
-        if (connector_v > CHARGING_VOLTAGE * 0.5f)
-            voltage_timer.reset();
+        if (connector_v > CONNECT_THRES_VOLTAGE) {
+            if (++connect_check_count > CONNECT_THRES_COUNT)
+                connect_check_count = CONNECT_THRES_COUNT;
+        } else {
+                connect_check_count = 0;
+        }
 #ifndef DEBUG
         while (serial.readable()) {
             if (serial_timer.elapsed_time() > 1s)
@@ -329,7 +322,7 @@ private:
         connector_temp[adc_ch] = T - 273.0f;
     }
     bool is_connected() const {
-        return connector_v > CONNECT_VOLTAGE * 0.5f;
+        return connect_check_count >= CONNECT_THRES_COUNT;
     }
     void poll_1s() {
         if (is_connected())
@@ -348,15 +341,17 @@ private:
 #endif
     AnalogIn connector{PB_1, 3.3f};
     DigitalOut sw{PB_2, 0};
-    Timer heartbeat_timer, voltage_timer, serial_timer;
+    Timer heartbeat_timer, serial_timer;
     serial_message msg;
     uint8_t heartbeat_counter{0};
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
+    uint32_t connect_check_count{0};
     int adc_ch{0};
     bool adc_measure_mode{false};
     static constexpr int ADDR{0b10010010};
+    static constexpr uint32_t CONNECT_THRES_COUNT{50};
     static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
-                           CONNECT_VOLTAGE{3.3f * 1000.0f / (9100.0f + 1000.0f)};
+                           CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)};
 };
 
 class bmu_controller {
@@ -383,6 +378,9 @@ public:
     }
     bool is_chargable() const {
         return (data.mod_status1 & 0b01000000) == 0 && data.rsoc < 95;
+    }
+    bool is_charging() const {
+        return data.pack_a > 0.0f;
     }
 private:
     void handle_can(const CANMessage &msg) {
@@ -599,6 +597,8 @@ private:
                 psw.reset_state();
                 set_new_state(POWER_STATE::POST);
             }
+            if (mc.is_plugged())
+                set_new_state(POWER_STATE::POST);
             break;
         case POWER_STATE::POST:
             if (!poweron_by_switch && !mc.is_plugged())
@@ -644,7 +644,9 @@ private:
                 !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 esw.asserted() || mbd.emergency_stop_from_ros() || mbd.is_dead())
                 set_new_state(POWER_STATE::STANDBY);
-            if (bmu.is_full_charge() || ac.is_charger_stopped() || !ac.is_docked() || ac.is_connector_overheat())
+            if (bmu.is_full_charge() || !ac.is_docked() || ac.is_connector_overheat() || mc.is_plugged())
+                set_new_state(POWER_STATE::NORMAL);
+            if (current_check_enable && !bmu.is_charging())
                 set_new_state(POWER_STATE::NORMAL);
             break;
         case POWER_STATE::MANUAL_CHARGE:
@@ -656,6 +658,13 @@ private:
         }
     }
     void set_new_state(POWER_STATE newstate) {
+        switch (state) {
+        case POWER_STATE::AUTO_CHARGE:
+            current_check_timeout.detach();
+            break;
+        default:
+            break;
+        }
         switch (newstate) {
         case POWER_STATE::OFF:
             LOG("enter OFF\n");
@@ -695,6 +704,8 @@ private:
         case POWER_STATE::AUTO_CHARGE:
             LOG("enter AUTO_CHARGE\n");
             ac.set_enable(true);
+            current_check_enable = false;
+            current_check_timeout.attach([this](){current_check_enable = true;}, 3s);
             break;
         case POWER_STATE::MANUAL_CHARGE:
             LOG("enter MANUAL_CHARGE\n");
@@ -770,7 +781,8 @@ private:
     DigitalOut bat_out{PB_5, 0}, heartbeat_led{PB_12, 0};
     POWER_STATE state{POWER_STATE::OFF};
     Timer timer_post, timer_shutdown;
-    bool poweron_by_switch{false}, wait_shutdown{false};
+    Timeout current_check_timeout;
+    bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false};
 };
 
 }
