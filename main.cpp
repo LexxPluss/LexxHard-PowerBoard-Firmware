@@ -302,6 +302,9 @@ public:
 #endif
         adc_ticktock();
     }
+    void update_rsoc(uint8_t rsoc) {
+        this->rsoc = rsoc;
+    }
 private:
     void adc_ticktock() {
         if (adc_measure_mode) {
@@ -363,7 +366,7 @@ private:
             send_heartbeat();
     }
     void send_heartbeat() {
-        uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read())};
+        uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read()), rsoc};
         serial_message::compose(buf, serial_message::HEARTBEAT, param);
 #ifndef SERIAL_DEBUG
         serial.write(buf, sizeof buf);
@@ -377,7 +380,7 @@ private:
     DigitalOut sw{PB_2, 0};
     Timer heartbeat_timer, serial_timer;
     serial_message msg;
-    uint8_t heartbeat_counter{0};
+    uint8_t heartbeat_counter{0}, rsoc{0};
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
     uint32_t connect_check_count{0};
     int adc_ch{2};
@@ -415,6 +418,9 @@ public:
     }
     bool is_charging() const {
         return data.pack_a > 0.0f;
+    }
+    uint8_t get_rsoc() const {
+        return data.rsoc;
     }
 private:
     void handle_can(const CANMessage &msg) {
@@ -671,6 +677,7 @@ private:
                 set_new_state(POWER_STATE::AUTO_CHARGE);
             break;
         case POWER_STATE::AUTO_CHARGE:
+            ac.update_rsoc(bmu.get_rsoc());
             if (psw.get_state() != power_switch::STATE::RELEASED || mbd.power_off_from_ros() ||
                 !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 esw.asserted() || mbd.emergency_stop_from_ros() || mbd.is_dead())
