@@ -275,7 +275,7 @@ private:
     void adc_ticktock() {
         if (adc_measure_mode) {
             adc_read();
-            adc_ch = adc_ch == 0 ? 1 : 0;
+            adc_ch = adc_ch == 2 ? 3 : 2;
             adc_measure_mode = false;
         } else {
             adc_measure();
@@ -316,7 +316,10 @@ private:
         float Rpu{adc_ch < 2 ? 27000.0f : 10000.0f};
         float R{Rpu * adc_voltage / (3.3f - adc_voltage)};
         float T{1.0f / (logf(R / R0) / B + 1.0f / T0)};
-        connector_temp[adc_ch] = T - 273.0f;
+        if (adc_ch == 0 || adc_ch == 2)
+            connector_temp[0] = T - 273.0f;
+        else
+            connector_temp[1] = T - 273.0f;
     }
     bool is_connected() const {
         return connect_check_count >= CONNECT_THRES_COUNT;
@@ -346,7 +349,7 @@ private:
     uint8_t heartbeat_counter{0};
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
     uint32_t connect_check_count{0};
-    int adc_ch{0};
+    int adc_ch{2};
     bool adc_measure_mode{false};
     static constexpr int ADDR{0b10010010};
     static constexpr uint32_t CONNECT_THRES_COUNT{50};
