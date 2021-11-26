@@ -380,7 +380,7 @@ public:
         return (data.mod_status1 & 0b01000000) != 0;
     }
     bool is_chargable() const {
-        return (data.mod_status1 & 0b01000000) == 0 && data.rsoc < 95;
+        return !is_full_charge() && data.rsoc < 95;
     }
     bool is_charging() const {
         return data.pack_a > 0.0f;
