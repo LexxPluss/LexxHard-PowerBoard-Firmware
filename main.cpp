@@ -624,6 +624,8 @@ private:
                 }
             } else if (!esw.asserted() && !mbd.emergency_stop_from_ros() && mbd.is_ready()) {
                 set_new_state(POWER_STATE::NORMAL);
+            } else if (mc.is_plugged()) {
+                set_new_state(POWER_STATE::MANUAL_CHARGE);
             }
             break;
         }
