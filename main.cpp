@@ -89,6 +89,31 @@ private:
     char buffer[128];
 } logger;
 
+class power_switch_handler_battery {
+public:
+    power_switch_handler_battery() {
+        timer.start();
+    }
+    void poll(bool changed) {
+        if (changed) {
+            activated = ++counter >= 4;
+            timer.reset();
+        }
+        auto elapsed{timer.elapsed_time()};
+        if (elapsed > 1s) {
+            counter = 0;
+            activated = false;
+        }
+    }
+    bool is_activated() const {
+        return activated;
+    }
+private:
+    Timer timer;
+    int counter{0};
+    bool activated{false};
+};
+
 class power_switch {
 public:
     enum class STATE {
@@ -96,7 +121,9 @@ public:
     };
     void poll() {
         int now{sw.read()};
-        if (prev != now) {
+        bool changed{prev != now};
+        sw_bat.poll(changed);
+        if (changed) {
             LOG("power_switch change to %d\n", now);
             prev = now;
             timer.reset();
@@ -124,7 +151,11 @@ public:
     void set_led(bool enabled) {
         led.write(enabled ? 1 : 0);
     }
+    bool is_activated_battery() const {
+        return sw_bat.is_activated();
+    }
 private:
+    power_switch_handler_battery sw_bat;
     DigitalIn sw{PB_0};
     DigitalOut led{PB_13, 0};
     Timer timer;
@@ -761,6 +792,9 @@ private:
         buf[6] = t1;
         buf[7] = temperature;
         can.send(CANMessage{0x200, buf});
+        ThisThread::sleep_for(1ms);
+        buf[0] = psw.is_activated_battery() ? 1 : 0;
+        can.send(CANMessage{0x202, buf, 1});
     }
     void poll_1s() {
         heartbeat_led = !heartbeat_led;
