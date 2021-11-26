@@ -237,13 +237,10 @@ public:
         serial_timer.start();
     }
     bool is_docked() const {
-        return is_connected() && heartbeat_timer.elapsed_time() < 5s;
+        return is_connected() && !is_overheat() && heartbeat_timer.elapsed_time() < 5s;
     }
     void set_enable(bool enable) {
         sw.write(enable ? 1 : 0);
-    }
-    bool is_connector_overheat() const {
-        return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
     }
     void get_connector_temperature(int &positive, int &negative) const {
         positive = connector_temp[0];
@@ -324,8 +321,11 @@ private:
     bool is_connected() const {
         return connect_check_count >= CONNECT_THRES_COUNT;
     }
+    bool is_overheat() const {
+        return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
+    }
     void poll_1s() {
-        if (is_connected())
+        if (is_connected() && !is_overheat())
             send_heartbeat();
     }
     void send_heartbeat() {
@@ -639,7 +639,7 @@ private:
                 !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
                 esw.asserted() || mbd.emergency_stop_from_ros() || mbd.is_dead())
                 set_new_state(POWER_STATE::STANDBY);
-            if (bmu.is_full_charge() || !ac.is_docked() || ac.is_connector_overheat() || mc.is_plugged())
+            if (bmu.is_full_charge() || !ac.is_docked() || mc.is_plugged())
                 set_new_state(POWER_STATE::NORMAL);
             if (current_check_enable && !bmu.is_charging())
                 set_new_state(POWER_STATE::NORMAL);
