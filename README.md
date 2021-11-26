@@ -58,9 +58,9 @@ File pathで書き込みファイルを選ぶ、Start addressは0x08000000、Sta
 
 ## Power Board CAN message
 
-### 1000 (0x3e8)
+### 512 (0x200)
 
-Power Board Status
+Power Board Status (Published from Power Board)
 
 | byte offset | info | detail |
 |---|---|---|
@@ -72,3 +72,29 @@ Power Board Status
 | 5 | charge connector temperature (Positive) | 0-100 (degC) |
 | 6 | charge connector temperature (Negative) | 0-100 (degC) |
 | 7 | board temperature | -50-127 (degC) |
+
+### 513 (0x201)
+
+Main Board and ROS Status (Published from Main Board)
+
+| byte offset | info | detail |
+|---|---|---|
+| 0 | Emergency stop | 1:asserted |
+| 1 | Power off | 1:asserted |
+| 2 | ROS Heartbeat timeout | 1:asserted |
+
+### 514 (0x202)
+
+Power Board Notification (Published from Power Board)
+
+| byte offset | info | detail |
+|---|---|---|
+| 0 | Notification code | 1: battery remaining |
+
+### 768 (0x300)
+
+Power Board Log Message (Published from Power Board)
+
+| byte offset | info | detail |
+|---|---|---|
+| 0-7 | message | NULL terminate string |
