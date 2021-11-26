@@ -3,8 +3,8 @@
 
 namespace {
 
-#undef DEBUG
-#ifdef DEBUG
+#undef SERIAL_DEBUG
+#ifdef SERIAL_DEBUG
 BufferedSerial debugserial{PA_2, PA_3};
 FILE *debugout{fdopen(&debugserial, "r+")};
 #define LOG(...) fprintf(debugout, __VA_ARGS__)
@@ -142,7 +142,7 @@ public:
     }
     void get_raw_state(bool &left, bool &right) const {
         left = right = asserted;
-#ifdef DEBUG
+#ifdef SERIAL_DEBUG
         static bool prev{false};
         if (prev != asserted) {
             prev = asserted;
@@ -227,7 +227,7 @@ class auto_charger {
 public:
     auto_charger(I2C &i2c) : i2c(i2c) {}
     void init() {
-#ifndef DEBUG
+#ifndef SERIAL_DEBUG
         serial.set_baud(4800);
         serial.set_format(8, SerialBase::None, 1);
         serial.set_blocking(false);
@@ -257,7 +257,7 @@ public:
         } else {
                 connect_check_count = 0;
         }
-#ifndef DEBUG
+#ifndef SERIAL_DEBUG
         while (serial.readable()) {
             if (serial_timer.elapsed_time() > 1s)
                 msg.reset();
@@ -331,12 +331,12 @@ private:
     void send_heartbeat() {
         uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read())};
         serial_message::compose(buf, serial_message::HEARTBEAT, param);
-#ifndef DEBUG
+#ifndef SERIAL_DEBUG
         serial.write(buf, sizeof buf);
 #endif
     }
     I2C &i2c;
-#ifndef DEBUG
+#ifndef SERIAL_DEBUG
     BufferedSerial serial{PA_2, PA_3};
 #endif
     AnalogIn connector{PB_1, 3.3f};
