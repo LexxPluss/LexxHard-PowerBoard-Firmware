@@ -775,6 +775,8 @@ private:
             buf[1] |= 0b00000001;
         if (ac.is_docked())
             buf[1] |= 0b00000010;
+        if (wait_shutdown)
+            buf[1] |= 0b10000000;
         dcdc.get_failed_state(st0, st1);
         if (st0)
             buf[2] |= 0b00000001;
