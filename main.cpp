@@ -89,14 +89,14 @@ private:
     char buffer[128];
 } logger;
 
-class power_switch_handler_battery {
+class power_switch_handler {
 public:
-    power_switch_handler_battery() {
+    power_switch_handler(int thres) : thres(thres * 2) {
         timer.start();
     }
     void poll(bool changed) {
         if (changed) {
-            activated = ++counter >= 4;
+            activated = ++counter >= thres;
             timer.reset();
         }
         auto elapsed{timer.elapsed_time()};
@@ -110,7 +110,7 @@ public:
     }
 private:
     Timer timer;
-    int counter{0};
+    int thres, counter{0};
     bool activated{false};
 };
 
@@ -155,7 +155,7 @@ public:
         return sw_bat.is_activated();
     }
 private:
-    power_switch_handler_battery sw_bat;
+    power_switch_handler sw_bat{2};
     DigitalIn sw{PB_0};
     DigitalOut led{PB_13, 0};
     Timer timer;
