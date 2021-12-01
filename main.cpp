@@ -552,7 +552,7 @@ public:
         can.register_callback(0x201, callback(this, &mainboard_controller::handle_can));
     }
     void poll() {
-        if (timer.elapsed_time() > 1s) {
+        if (timer.elapsed_time() > 3s) {
             heartbeat_timeout = true;
             timer.stop();
             timer.reset();
