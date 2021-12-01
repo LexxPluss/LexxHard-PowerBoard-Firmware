@@ -123,6 +123,7 @@ public:
         int now{sw.read()};
         bool changed{prev != now};
         sw_bat.poll(changed);
+        sw_unlock.poll(changed);
         if (changed) {
             LOG("power_switch change to %d\n", now);
             prev = now;
@@ -151,11 +152,17 @@ public:
     void set_led(bool enabled) {
         led.write(enabled ? 1 : 0);
     }
+    void toggle_led() {
+        led.write(led.read() == 0 ? 1 : 0);
+    }
     bool is_activated_battery() const {
         return sw_bat.is_activated();
     }
+    bool is_activated_unlock() const {
+        return sw_unlock.is_activated();
+    }
 private:
-    power_switch_handler sw_bat{2};
+    power_switch_handler sw_bat{2}, sw_unlock{10};
     DigitalIn sw{PB_0};
     DigitalOut led{PB_13, 0};
     Timer timer;
@@ -613,6 +620,7 @@ private:
         NORMAL,
         AUTO_CHARGE,
         MANUAL_CHARGE,
+        LOCKDOWN,
     };
     void poll() {
         can.poll();
@@ -644,8 +652,10 @@ private:
                 set_new_state(POWER_STATE::OFF);
             break;
         case POWER_STATE::STANDBY: {
+            if (mbd.is_dead())
+                set_new_state(POWER_STATE::LOCKDOWN);
             auto psw_state{psw.get_state()};
-            if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED || mbd.is_dead())
+            if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED)
                 set_new_state(POWER_STATE::OFF);
             if (psw_state == power_switch::STATE::PUSHED || mbd.power_off_from_ros() ||
                 !bmu.is_ok() || !temp.is_ok()) {
@@ -693,6 +703,12 @@ private:
             if (!mc.is_plugged())
                 set_new_state(POWER_STATE::NORMAL);
             break;
+        case POWER_STATE::LOCKDOWN:
+            if (!dcdc.is_ok() || psw.get_state() == power_switch::STATE::LONG_PUSHED)
+                set_new_state(POWER_STATE::OFF);
+            if (psw.is_activated_unlock())
+                set_new_state(POWER_STATE::STANDBY);
+            break;
         }
     }
     void set_new_state(POWER_STATE newstate) {
@@ -727,6 +743,7 @@ private:
             break;
         case POWER_STATE::STANDBY:
             LOG("enter STANDBY\n");
+            psw.set_led(true);
             dcdc.set_enable(true);
             wsw.set_disable(true);
             bat_out.write(1);
@@ -747,6 +764,12 @@ private:
             break;
         case POWER_STATE::MANUAL_CHARGE:
             LOG("enter MANUAL_CHARGE\n");
+            wsw.set_disable(true);
+            bat_out.write(0);
+            ac.set_enable(false);
+            break;
+        case POWER_STATE::LOCKDOWN:
+            LOG("enter LOCKDOWN\n");
             wsw.set_disable(true);
             bat_out.write(0);
             ac.set_enable(false);
@@ -804,6 +827,8 @@ private:
         ThisThread::sleep_for(1ms);
         buf[0] = psw.is_activated_battery() ? 1 : 0;
         can.send(CANMessage{0x202, buf, 1});
+        if (state == POWER_STATE::LOCKDOWN)
+            psw.toggle_led();
     }
     void poll_1s() {
         heartbeat_led = !heartbeat_led;
