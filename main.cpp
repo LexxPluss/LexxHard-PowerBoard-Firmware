@@ -708,7 +708,7 @@ private:
                 set_new_state(POWER_STATE::NORMAL);
             break;
         case POWER_STATE::LOCKDOWN:
-            if (!dcdc.is_ok() || psw.get_state() == power_switch::STATE::LONG_PUSHED)
+            if (!dcdc.is_ok() || psw.get_state() != power_switch::STATE::RELEASED)
                 set_new_state(POWER_STATE::OFF);
             if (psw.is_activated_unlock())
                 set_new_state(POWER_STATE::STANDBY);
