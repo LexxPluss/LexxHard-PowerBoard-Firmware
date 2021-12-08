@@ -652,8 +652,12 @@ private:
                 set_new_state(POWER_STATE::OFF);
             break;
         case POWER_STATE::STANDBY: {
-            if (mbd.is_dead())
-                set_new_state(POWER_STATE::LOCKDOWN);
+            if (mbd.is_dead()) {
+                if (wait_shutdown)
+                    set_new_state(POWER_STATE::OFF);
+                else
+                    set_new_state(POWER_STATE::LOCKDOWN);
+            }
             auto psw_state{psw.get_state()};
             if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED)
                 set_new_state(POWER_STATE::OFF);
