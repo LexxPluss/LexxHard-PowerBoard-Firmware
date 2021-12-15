@@ -639,17 +639,20 @@ private:
                 poweron_by_switch = true;
                 psw.reset_state();
                 set_new_state(POWER_STATE::POST);
-            }
-            if (mc.is_plugged())
+            } else if (mc.is_plugged()) {
                 set_new_state(POWER_STATE::POST);
+            }
             break;
         case POWER_STATE::POST:
-            if (!poweron_by_switch && !mc.is_plugged())
+            if (!poweron_by_switch && !mc.is_plugged()) {
+                LOG("unplugged from manual charger\n");
                 set_new_state(POWER_STATE::OFF);
-            if (bmu.is_ok() && temp.is_ok())
+            } else if (bmu.is_ok() && temp.is_ok()) {
+                LOG("BMU OK\n");
                 set_new_state(POWER_STATE::STANDBY);
-            else if (timer_post.elapsed_time() > 3s)
+            } else if (timer_post.elapsed_time() > 3s) {
                 set_new_state(POWER_STATE::OFF);
+            }
             break;
         case POWER_STATE::STANDBY: {
             if (mbd.is_dead()) {
@@ -659,9 +662,9 @@ private:
                     set_new_state(POWER_STATE::LOCKDOWN);
             }
             auto psw_state{psw.get_state()};
-            if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED)
+            if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED) {
                 set_new_state(POWER_STATE::OFF);
-            if (psw_state == power_switch::STATE::PUSHED || mbd.power_off_from_ros() ||
+            } else if (psw_state == power_switch::STATE::PUSHED || mbd.power_off_from_ros() ||
                 !bmu.is_ok() || !temp.is_ok()) {
                 if (wait_shutdown) {
                     if (timer_shutdown.elapsed_time() > 60s)
@@ -674,44 +677,108 @@ private:
                     timer_shutdown.start();
                 }
             } else if (!esw.asserted() && !mbd.emergency_stop_from_ros() && mbd.is_ready()) {
+                LOG("not emergency and heartbeat OK\n");
                 set_new_state(POWER_STATE::NORMAL);
             } else if (mc.is_plugged()) {
+                LOG("plugged to manual charger\n");
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
             }
             break;
         }
         case POWER_STATE::NORMAL:
-            if (psw.get_state() != power_switch::STATE::RELEASED || mbd.power_off_from_ros() ||
-                !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
-                esw.asserted() || mbd.emergency_stop_from_ros() || mbd.is_dead())
+            if (psw.get_state() != power_switch::STATE::RELEASED) {
+                LOG("detect power switch\n");
                 set_new_state(POWER_STATE::STANDBY);
-            if (mc.is_plugged())
+            } else if (mbd.power_off_from_ros()) {
+                LOG("receive power off from ROS\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (!bmu.is_ok()) {
+                LOG("receive power off from ROS\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (!temp.is_ok()) {
+                LOG("BMU failure\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (!dcdc.is_ok()) {
+                LOG("DCDC failure\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (esw.asserted()) {
+                LOG("emergency switch asserted\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (mbd.emergency_stop_from_ros()) {
+                LOG("receive emergency stop from ROS\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (mbd.is_dead()) {
+                LOG("main board or ROS dead\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (mc.is_plugged()) {
+                LOG("plugged to manual charger\n");
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
-            if (ac.is_docked() && bmu.is_chargable())
+            } else if (ac.is_docked() && bmu.is_chargable()) {
+                LOG("docked to auto charger\n");
                 set_new_state(POWER_STATE::AUTO_CHARGE);
+            }
             break;
         case POWER_STATE::AUTO_CHARGE:
             ac.update_rsoc(bmu.get_rsoc());
-            if (psw.get_state() != power_switch::STATE::RELEASED || mbd.power_off_from_ros() ||
-                !bmu.is_ok() || !temp.is_ok() || !dcdc.is_ok() ||
-                esw.asserted() || mbd.emergency_stop_from_ros() || mbd.is_dead())
+            if (psw.get_state() != power_switch::STATE::RELEASED) {
+                LOG("detect power switch\n");
                 set_new_state(POWER_STATE::STANDBY);
-            if (bmu.is_full_charge() || !ac.is_docked() || mc.is_plugged())
+            } else if (mbd.power_off_from_ros()) {
+                LOG("receive power off from ROS\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (!bmu.is_ok()) {
+                LOG("receive power off from ROS\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (!temp.is_ok()) {
+                LOG("BMU failure\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (!dcdc.is_ok()) {
+                LOG("DCDC failure\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (esw.asserted()) {
+                LOG("emergency switch asserted\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (mbd.emergency_stop_from_ros()) {
+                LOG("receive emergency stop from ROS\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (mbd.is_dead()) {
+                LOG("main board or ROS dead\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (bmu.is_full_charge()) {
+                LOG("full charge\n");
                 set_new_state(POWER_STATE::NORMAL);
-            if (current_check_enable && !bmu.is_charging())
+            } else if (!ac.is_docked()) {
+                LOG("undocked from auto charger\n");
                 set_new_state(POWER_STATE::NORMAL);
+            } else if (mc.is_plugged()) {
+                LOG("manual charger plugged\n");
+                set_new_state(POWER_STATE::NORMAL);
+            } else if (current_check_enable && !bmu.is_charging()) {
+                LOG("not charging\n");
+                set_new_state(POWER_STATE::NORMAL);
+            }
             break;
         case POWER_STATE::MANUAL_CHARGE:
-            if (psw.get_state() != power_switch::STATE::RELEASED)
+            if (psw.get_state() != power_switch::STATE::RELEASED) {
+                LOG("detect power switch (ignored)\n");
                 psw.reset_state();
-            if (!mc.is_plugged())
+            }
+            if (!mc.is_plugged()) {
+                LOG("unplugged from manual charger\n");
                 set_new_state(POWER_STATE::NORMAL);
+            }
             break;
         case POWER_STATE::LOCKDOWN:
-            if (!dcdc.is_ok() || psw.get_state() != power_switch::STATE::RELEASED)
+            if (!dcdc.is_ok()) {
+                LOG("DCDC failure\n");
                 set_new_state(POWER_STATE::OFF);
-            if (psw.is_activated_unlock())
+            } else if (psw.get_state() != power_switch::STATE::RELEASED) {
+                LOG("detect power switch\n");
+                set_new_state(POWER_STATE::OFF);
+            } else if (psw.is_activated_unlock()) {
+                LOG("force recover from lockdown\n");
                 set_new_state(POWER_STATE::STANDBY);
+            }
             break;
         }
     }
