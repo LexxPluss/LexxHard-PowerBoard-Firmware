@@ -20,6 +20,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v2
       - name: build
+        id: build
         run: |
           set -e
           mbed-tools deploy
@@ -41,7 +42,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./cmake_build/LEXXPLUSS_PB01/develop/GCC_ARM/mbed-os-powerboard.bin
+          asset_path: /__w/mbed-os-powerboard/mbed-os-powerboard/cmake_build/LEXXPLUSS_PB01/release/GCC_ARM/mbed-os-powerboard.bin
           asset_name: mbed-os-powerboard.bin
           asset_content_type: application/octet-stream
       - uses: act10ns/slack@v1
