@@ -831,7 +831,7 @@ private:
             LOG("enter AUTO_CHARGE\n");
             ac.set_enable(true);
             current_check_enable = false;
-            current_check_timeout.attach([this](){current_check_enable = true;}, 3s);
+            current_check_timeout.attach([this](){current_check_enable = true;}, 10s);
             break;
         case POWER_STATE::MANUAL_CHARGE:
             LOG("enter MANUAL_CHARGE\n");
