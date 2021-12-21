@@ -196,13 +196,41 @@ private:
 
 class emergency_switch {
 public:
-    bool asserted() {return left.read() == 1 || right.read() == 1;}
-    void get_raw_state(bool &left, bool &right) {
-        left = this->left.read() == 1;
-        right = this->right.read() == 1;
+    void poll() {
+        int now{left.read()};
+        if (left_prev != now) {
+            left_prev = now;
+            left_count = 0;
+        } else {
+            ++left_count;
+        }
+        if (left_count > COUNT) {
+            left_count = COUNT;
+            left_asserted = now == 1;
+        }
+        now = right.read();
+        if (right_prev != now) {
+            right_prev = now;
+            right_count = 0;
+        } else {
+            ++right_count;
+        }
+        if (right_count > COUNT) {
+            right_count = COUNT;
+            right_asserted = now == 1;
+        }
+    }
+    bool asserted() const {return left_asserted || right_asserted;}
+    void get_raw_state(bool &left, bool &right) const {
+        left = left_asserted;
+        right = right_asserted;
     }
 private:
     DigitalIn left{PA_6}, right{PA_7};
+    uint32_t left_count{0}, right_count{0};
+    int left_prev{-1}, right_prev{-1};
+    bool left_asserted{false}, right_asserted{false};
+    static constexpr uint32_t COUNT{5};
 };
 
 class wheel_switch {
@@ -626,6 +654,7 @@ private:
         can.poll();
         psw.poll();
         bsw.poll();
+        esw.poll();
         mc.poll();
         ac.poll();
         temp.poll();
