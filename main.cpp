@@ -393,7 +393,7 @@ private:
     int adc_ch{2};
     bool adc_measure_mode{false};
     static constexpr int ADDR{0b10010010};
-    static constexpr uint32_t CONNECT_THRES_COUNT{50};
+    static constexpr uint32_t CONNECT_THRES_COUNT{100};
     static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
                            CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)};
 };
