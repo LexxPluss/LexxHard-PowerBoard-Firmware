@@ -742,7 +742,7 @@ private:
             } else if (mc.is_plugged()) {
                 LOG("plugged to manual charger\n");
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
-            } else if (ac.is_docked() && bmu.is_chargable()) {
+            } else if (!charge_guard_asserted && ac.is_docked() && bmu.is_chargable()) {
                 LOG("docked to auto charger\n");
                 set_new_state(POWER_STATE::AUTO_CHARGE);
             }
@@ -813,6 +813,9 @@ private:
     }
     void set_new_state(POWER_STATE newstate) {
         switch (state) {
+        case POWER_STATE::NORMAL:
+            charge_guard_timeout.detach();
+            break;
         case POWER_STATE::AUTO_CHARGE:
             current_check_timeout.detach();
             break;
@@ -855,6 +858,8 @@ private:
             wsw.set_disable(false);
             bat_out.write(1);
             ac.set_enable(false);
+            charge_guard_asserted = true;
+            charge_guard_timeout.attach([this](){charge_guard_asserted = false;}, 10s);
             break;
         case POWER_STATE::AUTO_CHARGE:
             LOG("enter AUTO_CHARGE\n");
@@ -949,8 +954,8 @@ private:
     DigitalOut bat_out{PB_5, 0}, heartbeat_led{PB_12, 0};
     POWER_STATE state{POWER_STATE::OFF};
     Timer timer_post, timer_shutdown;
-    Timeout current_check_timeout;
-    bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false};
+    Timeout current_check_timeout, charge_guard_timeout;
+    bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false}, charge_guard_asserted{false};
 };
 
 }
