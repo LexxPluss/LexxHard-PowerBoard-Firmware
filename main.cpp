@@ -308,6 +308,10 @@ public:
     void set_enable(bool enable) {
         sw.write(enable ? 1 : 0);
     }
+    void force_stop() {
+        set_enable(false);
+        send_heartbeat();
+    }
     void get_connector_temperature(int &positive, int &negative) const {
         positive = connector_temp[0];
         negative = connector_temp[1];
@@ -818,6 +822,7 @@ private:
             break;
         case POWER_STATE::AUTO_CHARGE:
             current_check_timeout.detach();
+            ac.force_stop();
             break;
         default:
             break;
