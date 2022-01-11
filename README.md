@@ -1,6 +1,7 @@
 # LexxPluss Power Board Software
 
 [![CI](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/main.yml/badge.svg)](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/main.yml)
+[![release](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/release.yml/badge.svg)](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/release.yml)
 
 ## Install Mbed CLI 2 (mbed-tools).
 https://os.mbed.com/docs/mbed-os/v6.15/build-tools/install-or-upgrade.html
