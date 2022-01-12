@@ -688,15 +688,11 @@ private:
             }
             break;
         case POWER_STATE::STANDBY: {
-            if (mbd.is_dead()) {
-                if (wait_shutdown)
-                    set_new_state(POWER_STATE::OFF);
-                else
-                    set_new_state(POWER_STATE::LOCKDOWN);
-            }
             auto psw_state{psw.get_state()};
             if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED) {
                 set_new_state(POWER_STATE::OFF);
+            } else if (mbd.is_dead()) {
+                set_new_state(wait_shutdown ? POWER_STATE::OFF : POWER_STATE::LOCKDOWN);
             } else if (psw_state == power_switch::STATE::PUSHED || mbd.power_off_from_ros() ||
                 !bmu.is_ok() || !temp.is_ok()) {
                 if (wait_shutdown) {
