@@ -642,6 +642,7 @@ public:
         globalqueue.call_every(20ms, this, &state_controller::poll);
         globalqueue.call_every(100ms, this, &state_controller::poll_100ms);
         globalqueue.call_every(1s, this, &state_controller::poll_1s);
+        globalqueue.call_every(10s, this, &state_controller::poll_10s);
     }
 private:
     enum class POWER_STATE {
@@ -938,6 +939,10 @@ private:
     }
     void poll_1s() {
         heartbeat_led = !heartbeat_led;
+    }
+    void poll_10s() {
+        uint8_t buf[8]{'1', '0', '1'};
+        can.send(CANMessage{0x203, buf});
     }
     I2C i2c{PB_7, PB_6};
     can_driver can;

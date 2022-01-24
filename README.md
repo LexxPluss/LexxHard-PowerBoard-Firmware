@@ -94,6 +94,16 @@ Power Board Notification (Published from Power Board)
 |---|---|---|
 | 0 | Notification code | 1: battery remaining |
 
+### 515 (0x203)
+
+Power Board Version Message (Published from Power Board)
+
+| byte offset | info | detail |
+|---|---|---|
+| 0 | major | major version number |
+| 1 | minor | minor version number |
+| 2 | patch | patch number |
+
 ### 768 (0x300)
 
 Power Board Log Message (Published from Power Board)
