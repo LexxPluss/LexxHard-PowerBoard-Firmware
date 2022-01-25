@@ -723,10 +723,10 @@ private:
                 LOG("receive power off from ROS\n");
                 set_new_state(POWER_STATE::STANDBY);
             } else if (!bmu.is_ok()) {
-                LOG("receive power off from ROS\n");
+                LOG("BMU failure\n");
                 set_new_state(POWER_STATE::STANDBY);
             } else if (!temp.is_ok()) {
-                LOG("BMU failure\n");
+                LOG("power board overheat\n");
                 set_new_state(POWER_STATE::STANDBY);
             } else if (!dcdc.is_ok()) {
                 LOG("DCDC failure\n");
@@ -757,10 +757,10 @@ private:
                 LOG("receive power off from ROS\n");
                 set_new_state(POWER_STATE::STANDBY);
             } else if (!bmu.is_ok()) {
-                LOG("receive power off from ROS\n");
+                LOG("BMU failure\n");
                 set_new_state(POWER_STATE::STANDBY);
             } else if (!temp.is_ok()) {
-                LOG("BMU failure\n");
+                LOG("power board overheat\n");
                 set_new_state(POWER_STATE::STANDBY);
             } else if (!dcdc.is_ok()) {
                 LOG("DCDC failure\n");
