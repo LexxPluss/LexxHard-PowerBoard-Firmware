@@ -682,7 +682,7 @@ private:
                 LOG("unplugged from manual charger\n");
                 set_new_state(POWER_STATE::OFF);
             } else if (bmu.is_ok() && temp.is_ok()) {
-                LOG("BMU OK\n");
+                LOG("BMU and temperature OK\n");
                 set_new_state(POWER_STATE::STANDBY);
             } else if (timer_post.elapsed_time() > 3s) {
                 set_new_state(POWER_STATE::OFF);
