@@ -627,6 +627,9 @@ public:
     bool is_ready() const {
         return heartbeat_detect;
     }
+    bool is_overheat() const {
+        return mainboard_overheat || actuatorboard_overheat;
+    }
 private:
     void handle_can(const CANMessage &msg) {
         heartbeat_timeout = false;
@@ -635,12 +638,15 @@ private:
         emergency_stop = msg.data[0] != 0;
         power_off = msg.data[1] != 0;
         ros_heartbeat_timeout = msg.data[2] != 0;
+        mainboard_overheat = msg.data[3] != 0;
+        actuatorboard_overheat = msg.data[4] != 0;
         if (!ros_heartbeat_timeout)
             heartbeat_detect = true;
     }
     can_driver &can;
     Timer timer;
-    bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false};
+    bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false},
+         mainboard_overheat{false}, actuatorboard_overheat{false};
 };
 
 class state_controller {
@@ -710,7 +716,7 @@ private:
             } else if (mbd.is_dead()) {
                 set_new_state(wait_shutdown ? POWER_STATE::OFF : POWER_STATE::LOCKDOWN);
             } else if (psw_state == power_switch::STATE::PUSHED || mbd.power_off_from_ros() ||
-                !bmu.is_ok() || !temp.is_ok()) {
+                mbd.is_overheat() || !bmu.is_ok() || !temp.is_ok()) {
                 if (wait_shutdown) {
                     if (timer_shutdown.elapsed_time() > 60s)
                         set_new_state(POWER_STATE::OFF);
@@ -755,6 +761,9 @@ private:
             } else if (mbd.is_dead()) {
                 LOG("main board or ROS dead\n");
                 set_new_state(POWER_STATE::STANDBY);
+            } else if (mbd.is_overheat()) {
+                LOG("main or actuator board overheat\n");
+                set_new_state(POWER_STATE::STANDBY);
             } else if (mc.is_plugged()) {
                 LOG("plugged to manual charger\n");
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
@@ -788,6 +797,9 @@ private:
                 set_new_state(POWER_STATE::STANDBY);
             } else if (mbd.is_dead()) {
                 LOG("main board or ROS dead\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (mbd.is_overheat()) {
+                LOG("main or actuator board overheat\n");
                 set_new_state(POWER_STATE::STANDBY);
             } else if (bmu.is_full_charge()) {
                 LOG("full charge\n");
