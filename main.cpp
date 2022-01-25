@@ -121,22 +121,35 @@ public:
     };
     void poll() {
         int now{sw.read()};
-        bool changed{prev != now};
-        sw_bat.poll(changed);
-        sw_unlock.poll(changed);
-        if (changed) {
-            LOG("power_switch change to %d\n", now);
-            prev = now;
-            timer.reset();
-            timer.start();
-        } else if (now == 0) {
-            auto elapsed{timer.elapsed_time()};
-            if (elapsed > 10s) {
-                if (state != STATE::LONG_PUSHED)
-                    state = STATE::LONG_PUSHED;
-            } else if (elapsed > 3s) {
-                if (state == STATE::RELEASED)
-                    state = STATE::PUSHED;
+        if (prev_raw != now) {
+            prev_raw = now;
+            count = 0;
+        } else {
+            ++count;
+        }
+        bool asserted{false};
+        if (count > COUNT) {
+            count = COUNT;
+            asserted = true;
+        }
+        if (asserted) {
+            bool changed{prev != now};
+            sw_bat.poll(changed);
+            sw_unlock.poll(changed);
+            if (changed) {
+                LOG("power_switch change to %d\n", now);
+                prev = now;
+                timer.reset();
+                timer.start();
+            } else if (now == 0) {
+                auto elapsed{timer.elapsed_time()};
+                if (elapsed > 10s) {
+                    if (state != STATE::LONG_PUSHED)
+                        state = STATE::LONG_PUSHED;
+                } else if (elapsed > 3s) {
+                    if (state == STATE::RELEASED)
+                        state = STATE::PUSHED;
+                }
             }
         }
     }
@@ -167,7 +180,9 @@ private:
     DigitalOut led{PB_13, 0};
     Timer timer;
     STATE state{STATE::RELEASED};
-    int prev{-1};
+    uint32_t count{0};
+    int prev{-1}, prev_raw{-1};
+    static constexpr uint32_t COUNT{1};
 };
 
 class bumper_switch {
