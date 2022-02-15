@@ -968,7 +968,7 @@ private:
         heartbeat_led = !heartbeat_led;
     }
     void poll_10s() {
-        uint8_t buf[8]{'1', '0', '1'};
+        uint8_t buf[8]{'1', '0', '2'}; // version
         can.send(CANMessage{0x203, buf});
     }
     I2C i2c{PB_7, PB_6};
