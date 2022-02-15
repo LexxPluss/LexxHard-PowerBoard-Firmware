@@ -43,7 +43,7 @@ jobs:
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: /__w/mbed-os-powerboard/mbed-os-powerboard/cmake_build/LEXXPLUSS_PB01/release/GCC_ARM/mbed-os-powerboard.bin
-          asset_name: mbed-os-powerboard.bin
+          asset_name: mbed-os-powerboard-${{ github.ref_name }}.bin
           asset_content_type: application/octet-stream
       - uses: act10ns/slack@v1
         with:
