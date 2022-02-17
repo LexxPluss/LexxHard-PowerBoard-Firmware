@@ -732,6 +732,16 @@ private:
                     bat_out.write(0);
                     timer_shutdown.reset();
                     timer_shutdown.start();
+                    if (psw_state == power_switch::STATE::PUSHED)
+                        shutdown_reason = SHUTDOWN_REASON::SWITCH;
+                    if (mbd.power_off_from_ros())
+                        shutdown_reason = SHUTDOWN_REASON::ROS;
+                    if (mbd.is_overheat())
+                        shutdown_reason = SHUTDOWN_REASON::MAINBOARD_TEMP;
+                    if (!bmu.is_ok())
+                        shutdown_reason = SHUTDOWN_REASON::BMU;
+                    if (!temp.is_ok())
+                        shutdown_reason = SHUTDOWN_REASON::POWERBOARD_TEMP;
                 }
             } else if (!esw.asserted() && !mbd.emergency_stop_from_ros() && mbd.is_ready()) {
                 LOG("not emergency and heartbeat OK\n");
@@ -938,6 +948,7 @@ private:
             buf[1] |= 0b00000001;
         if (ac.is_docked())
             buf[1] |= 0b00000010;
+        buf[1] |= (static_cast<uint32_t>(shutdown_reason) & 0x1f) << 2;
         if (wait_shutdown)
             buf[1] |= 0b10000000;
         dcdc.get_failed_state(st0, st1);
@@ -957,6 +968,7 @@ private:
             buf[3] |= 0b00000001;
         if (st1)
             buf[3] |= 0b00000010;
+        buf[3] |= static_cast<uint32_t>(state) << 2;
         int t0, t1;
         ac.get_connector_temperature(t0, t1);
         buf[4] = fan.get_duty_percent();
@@ -994,6 +1006,14 @@ private:
     mainboard_controller mbd{can};
     DigitalOut bat_out{PB_5, 0}, heartbeat_led{PB_12, 0};
     POWER_STATE state{POWER_STATE::OFF};
+    enum class SHUTDOWN_REASON {
+        NONE,
+        SWITCH,
+        ROS,
+        MAINBOARD_TEMP,
+        POWERBOARD_TEMP,
+        BMU,
+    } shutdown_reason{SHUTDOWN_REASON::NONE};
     Timer timer_post, timer_shutdown;
     Timeout current_check_timeout, charge_guard_timeout;
     bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false}, charge_guard_asserted{false};
