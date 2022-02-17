@@ -70,7 +70,7 @@ Power Board Status (Published from Power Board)
 | 0 | switch status bitmap | ![switch_status](docs/0_switch_status.svg) |
 | 1 | power status bitmap | ![charging_status](docs/1_charging_status.svg) |
 | 2 | dc/dc failure bitmap / bmu status bitmap | ![dcdc_bmu](docs/2_dcdc_bmu.svg) |
-| 3 | wheel disabled bitmap | ![wheel_status](docs/3_wheel_disable.svg) |
+| 3 | state, wheel disabled bitmap | ![wheel_status](docs/3_wheel_disable.svg) |
 | 4 | fan duty | 0-100 (%) |
 | 5 | charge connector temperature (Positive) | 0-100 (degC) |
 | 6 | charge connector temperature (Negative) | 0-100 (degC) |

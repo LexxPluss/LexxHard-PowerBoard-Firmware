@@ -1,28 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="80" viewBox="0 0 640 80">
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160">
   <g transform="translate(0.5,0.5)" text-anchor="middle" font-size="14" font-family="sans-serif" font-weight="normal">
     <g transform="translate(4,21)">
       <g stroke="black" stroke-width="1" stroke-linecap="round">
         <line x2="631"/>
-        <line x2="631" y1="41" y2="41"/>
-        <line y2="41"/>
-        <line x1="631" x2="631" y2="41"/>
-        <line x1="552" x2="552" y2="41"/>
-        <line x1="473" x2="473" y2="41"/>
-        <line x1="394" x2="394" y2="5"/>
-        <line x1="394" x2="394" y1="41" y2="36"/>
-        <line x1="316" x2="316" y2="5"/>
-        <line x1="316" x2="316" y1="41" y2="36"/>
-        <line x1="237" x2="237" y2="5"/>
-        <line x1="237" x2="237" y1="41" y2="36"/>
-        <line x1="158" x2="158" y2="5"/>
-        <line x1="158" x2="158" y1="41" y2="36"/>
-        <line x1="79" x2="79" y2="5"/>
-        <line x1="79" x2="79" y1="41" y2="36"/>
+        <line x2="631" y1="23" y2="23"/>
+        <line y2="23"/>
+        <line x1="631" x2="631" y2="23"/>
+        <line x1="552" x2="552" y2="23"/>
+        <line x1="473" x2="473" y2="23"/>
+        <line x1="394" x2="394" y2="2"/>
+        <line x1="394" x2="394" y1="23" y2="21"/>
+        <line x1="316" x2="316" y2="2"/>
+        <line x1="316" x2="316" y1="23" y2="21"/>
+        <line x1="237" x2="237" y2="2"/>
+        <line x1="237" x2="237" y1="23" y2="21"/>
+        <line x1="158" x2="158" y2="2"/>
+        <line x1="158" x2="158" y1="23" y2="21"/>
+        <line x1="79" x2="79" y2="2"/>
+        <line x1="79" x2="79" y1="23" y2="21"/>
       </g>
       <g>
-        <g>
-          <rect width="473" height="41" style="fill-opacity:0.1"/>
-        </g>
+        <g/>
         <g transform="translate(39,-11)">
           <g transform="translate(552)">
             <text y="6">0</text>
@@ -37,7 +35,7 @@
             <text y="6">7</text>
           </g>
         </g>
-        <g transform="translate(39,20)">
+        <g transform="translate(39,11)">
           <g transform="translate(552)">
             <text y="6">
               <tspan>LEFT</tspan>
@@ -48,8 +46,13 @@
               <tspan>RIGHT</tspan>
             </text>
           </g>
+          <g transform="translate(197)">
+            <text y="6">
+              <tspan>STATE</tspan>
+            </text>
+          </g>
         </g>
-        <g transform="translate(39,49)">
+        <g transform="translate(39,31)">
           <g transform="translate(552)">
             <text y="6">
               <tspan>1:disable</tspan>
@@ -59,6 +62,48 @@
             <text y="6">
               <tspan>1:disable</tspan>
             </text>
+          </g>
+          <g>
+            <g transform="translate(197)">
+              <text y="6">
+                <tspan>0:off</tspan>
+              </text>
+            </g>
+            <g transform="translate(197,14)">
+              <text y="6">
+                <tspan>1:wait</tspan>
+              </text>
+            </g>
+            <g transform="translate(197,28)">
+              <text y="6">
+                <tspan>2:post</tspan>
+              </text>
+            </g>
+            <g transform="translate(197,42)">
+              <text y="6">
+                <tspan>3:standby</tspan>
+              </text>
+            </g>
+            <g transform="translate(197,56)">
+              <text y="6">
+                <tspan>4:normal</tspan>
+              </text>
+            </g>
+            <g transform="translate(197,70)">
+              <text y="6">
+                <tspan>5:auto charge</tspan>
+              </text>
+            </g>
+            <g transform="translate(197,84)">
+              <text y="6">
+                <tspan>6:manual charge</tspan>
+              </text>
+            </g>
+            <g transform="translate(197,98)">
+              <text y="6">
+                <tspan>7:lockdown</tspan>
+              </text>
+            </g>
           </g>
         </g>
       </g>

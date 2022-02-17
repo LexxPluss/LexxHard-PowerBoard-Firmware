@@ -1,6 +1,6 @@
 [
     {"name": "MANUAL", "bits": 1, "attr": "1:charging"},
     {"name": "AUTO",   "bits": 1, "attr": "1:charging"},
-    {                  "bits": 5},
+    {"name": "ShutDown Reason", "bits": 5, "attr": ["0:normal", "1:switch", "2:ros", "3:main temp", "4:power temp", "5:bmu"]},
     {"name": "ShutDown", "bits": 1, "attr": ["0:normal", "1:waiting"]}
 ]

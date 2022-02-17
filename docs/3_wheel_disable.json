@@ -1,5 +1,5 @@
 [
     {"name": "LEFT",  "bits": 1, "attr": "1:disable"},
     {"name": "RIGHT", "bits": 1, "attr": "1:disable"},
-    {                 "bits": 6}
+    {"name": "STATE", "bits": 6, "attr": ["0:off", "1:wait", "2:post", "3:standby", "4:normal", "5:auto charge", "6:manual charge", "7:lockdown"]}
 ]
