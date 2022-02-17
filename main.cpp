@@ -664,6 +664,12 @@ public:
         globalqueue.call_every(100ms, this, &state_controller::poll_100ms);
         globalqueue.call_every(1s, this, &state_controller::poll_1s);
         globalqueue.call_every(10s, this, &state_controller::poll_10s);
+        Watchdog &watchdog{Watchdog::get_instance()};
+        uint32_t watchdog_max{watchdog.get_max_timeout()};
+        uint32_t watchdog_timeout{10000U};
+        if (watchdog_timeout > watchdog_max)
+            watchdog_timeout = watchdog_max;
+        watchdog.start(watchdog_timeout);
     }
 private:
     enum class POWER_STATE {
@@ -966,6 +972,8 @@ private:
     }
     void poll_1s() {
         heartbeat_led = !heartbeat_led;
+        Watchdog &watchdog{Watchdog::get_instance()};
+        watchdog.kick();
     }
     void poll_10s() {
         uint8_t buf[8]{'1', '0', '2'}; // version
