@@ -14,6 +14,12 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 
 EventQueue globalqueue;
 
+template<typename T>
+inline const T &constrain(const T &val, const T &min, const T &max)
+{
+    return val < min ? min : (val > max ? max : val);
+}
+
 class can_callback {
 public:
     void register_callback(uint32_t msgid, Callback<void(const CANMessage &msg)> func) {
@@ -328,8 +334,8 @@ public:
         send_heartbeat();
     }
     void get_connector_temperature(int &positive, int &negative) const {
-        positive = connector_temp[0];
-        negative = connector_temp[1];
+        positive = constrain(static_cast<int>(connector_temp[0]), 0, 255);
+        negative = constrain(static_cast<int>(connector_temp[1]), 0, 255);
     }
     void poll() {
         connector_v = connector.read_voltage();
