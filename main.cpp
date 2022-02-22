@@ -336,6 +336,16 @@ public:
         positive = constrain(static_cast<int>(connector_temp[0]), 0, 255);
         negative = constrain(static_cast<int>(connector_temp[1]), 0, 255);
     }
+    uint32_t get_connector_voltage() const {
+        int32_t voltage_mv{static_cast<int32_t>(connector_v * 1e+3f)};
+        return constrain(voltage_mv, 0L, 3300L);
+    }
+    uint32_t get_connect_check_count() const {return connect_check_count;}
+    uint32_t get_heartbeat_delay() const {
+        auto seconds{std::chrono::duration_cast<std::chrono::seconds>(heartbeat_timer.elapsed_time())};
+        return constrain(static_cast<uint32_t>(seconds.count()), 0UL, 255UL);
+    }
+    bool is_temperature_error() const {return temperature_error;}
     void poll() {
         connector_v = connector.read_voltage();
         if (connector_v > CONNECT_THRES_VOLTAGE) {
@@ -991,8 +1001,16 @@ private:
         ThisThread::sleep_for(1ms);
         buf[0] = psw.is_activated_battery() ? 1 : 0;
         can.send(CANMessage{0x202, buf, 1});
+        ThisThread::sleep_for(1ms);
         if (state == POWER_STATE::LOCKDOWN)
             psw.toggle_led();
+        uint32_t v{ac.get_connector_voltage()};
+        buf[0] = v;
+        buf[1] = v >> 8;
+        buf[2] = ac.get_connect_check_count();
+        buf[3] = ac.get_heartbeat_delay();
+        buf[4] = ac.is_temperature_error();
+        can.send(CANMessage{0x204, buf, 5});
     }
     void poll_1s() {
         heartbeat_led = !heartbeat_led;

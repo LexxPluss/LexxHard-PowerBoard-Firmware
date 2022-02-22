@@ -104,6 +104,18 @@ Power Board Version Message (Published from Power Board)
 | 1 | minor | minor version number |
 | 2 | patch | patch number |
 
+### 516 (0x204)
+
+Power Board Auto Charge Status (Published from Power Board)
+
+| byte offset | info | detail |
+|---|---|---|
+| 0 | voltage (LSB) | auto charge connector voltage (LSB) (mV) |
+| 1 | voltage (MSB) | auto charge connector voltage (MSB) (mV) |
+| 2 | count | voltage check count |
+| 3 | heartbeat delay | time since the last heartbeat was received (sec) |
+| 4 | temperature error | connector temperature sensor error |
+
 ### 768 (0x300)
 
 Power Board Log Message (Published from Power Board)
