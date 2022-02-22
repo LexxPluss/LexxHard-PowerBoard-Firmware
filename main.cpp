@@ -323,7 +323,7 @@ public:
         serial_timer.start();
     }
     bool is_docked() const {
-        return is_connected() && !is_overheat() && heartbeat_timer.elapsed_time() < 5s;
+        return is_connected() && !temperature_error && !is_overheat() && heartbeat_timer.elapsed_time() < 5s;
     }
     void set_enable(bool enable) {
         sw.write(enable ? 1 : 0);
@@ -385,6 +385,9 @@ private:
             int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
             float voltage{static_cast<float>(value) / 32768.0f * 4.096f};
             calculate_temperature(voltage);
+            temperature_error = false;
+        } else {
+            temperature_error = true;
         }
     }
     void adc_measure() const {
@@ -425,7 +428,7 @@ private:
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
     }
     void poll_1s() {
-        if (is_connected() && !is_overheat())
+        if (is_connected() && !temperature_error && !is_overheat())
             send_heartbeat();
     }
     void send_heartbeat() {
@@ -446,7 +449,7 @@ private:
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
     uint32_t connect_check_count{0};
     int adc_ch{2};
-    bool adc_measure_mode{false};
+    bool adc_measure_mode{false}, temperature_error{false};
     static constexpr int ADDR{0b10010010};
     static constexpr uint32_t CONNECT_THRES_COUNT{100};
     static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
