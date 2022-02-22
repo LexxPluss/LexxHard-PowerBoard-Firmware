@@ -337,7 +337,7 @@ public:
             if (++connect_check_count > CONNECT_THRES_COUNT)
                 connect_check_count = CONNECT_THRES_COUNT;
         } else {
-                connect_check_count = 0;
+            connect_check_count = 0;
         }
 #ifndef SERIAL_DEBUG
         while (serial.readable()) {
