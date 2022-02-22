@@ -312,7 +312,6 @@ private:
 
 class auto_charger {
 public:
-    auto_charger(I2C &i2c) : i2c(i2c) {}
     void init() {
 #ifndef SERIAL_DEBUG
         serial.set_baud(4800);
@@ -379,6 +378,8 @@ private:
     void adc_read() {
         uint8_t buf[2];
         buf[0] = 0b00000000; // Conversion Register
+        I2C i2c{PB_7, PB_6};
+        i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
             int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
@@ -398,6 +399,8 @@ private:
         case 2: buf[1] |= 0b01100000; break;
         case 3: buf[1] |= 0b01110000; break;
         }
+        I2C i2c{PB_7, PB_6};
+        i2c.frequency(400000);
         i2c.write(ADDR, reinterpret_cast<const char*>(buf), sizeof buf);
     }
     void calculate_temperature(float adc_voltage) {
@@ -432,7 +435,6 @@ private:
         serial.write(buf, sizeof buf);
 #endif
     }
-    I2C &i2c;
 #ifndef SERIAL_DEBUG
     BufferedSerial serial{PA_2, PA_3};
 #endif
@@ -514,10 +516,11 @@ private:
 
 class temperature_sensor {
 public:
-    temperature_sensor(I2C &i2c) : i2c(i2c) {}
     void init() {
         uint8_t buf[2];
         buf[0] = 0x0b; // ID Register
+        I2C i2c{PB_7, PB_6};
+        i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 1) == 0 &&
             (buf[0] & 0b11111000) == 0b11001000) {
@@ -540,6 +543,8 @@ public:
     void poll() {
         uint8_t buf[2];
         buf[0] = 0x00; // Temperature Value MSB Register
+        I2C i2c{PB_7, PB_6};
+        i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
             int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
@@ -547,7 +552,6 @@ public:
         }
     }
 private:
-    I2C &i2c;
     float temperature{0.0f};
     static constexpr int ADDR{0b10010000};
 };
@@ -658,7 +662,6 @@ private:
 class state_controller {
 public:
     void init() {
-        i2c.frequency(100000);
         mc.init();
         ac.init();
         bmu.init();
@@ -997,16 +1000,15 @@ private:
         uint8_t buf[8]{'1', '0', '4'}; // version
         can.send(CANMessage{0x203, buf});
     }
-    I2C i2c{PB_7, PB_6};
     can_driver can;
     power_switch psw;
     bumper_switch bsw;
     emergency_switch esw;
     wheel_switch wsw;
     manual_charger mc;
-    auto_charger ac{i2c};
+    auto_charger ac;
     bmu_controller bmu{can};
-    temperature_sensor temp{i2c};
+    temperature_sensor temp;
     dcdc_converter dcdc;
     fan_driver fan;
     mainboard_controller mbd{can};
