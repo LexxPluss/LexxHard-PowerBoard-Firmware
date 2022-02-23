@@ -573,10 +573,12 @@ class dcdc_converter {
 public:
     void set_enable(bool enable) {
         if (enable) {
+            // control[0].write(1);
             control[2].write(1); // external 5V must be turned on first.
             control[1].write(1);
         } else {
             control[1].write(0); // 16V must be turned off first.
+            // control[0].write(0);
             control[2].write(0);
         }
     }
