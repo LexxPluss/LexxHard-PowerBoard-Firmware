@@ -395,9 +395,13 @@ private:
             int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
             float voltage{static_cast<float>(value) / 32768.0f * 4.096f};
             calculate_temperature(voltage);
+            temperature_error_count = 0;
             temperature_error = false;
         } else {
-            temperature_error = true;
+            if (++temperature_error_count > 10) {
+                temperature_error_count = 10;
+                temperature_error = true;
+            }
         }
     }
     void adc_measure() const {
@@ -457,7 +461,7 @@ private:
     serial_message msg;
     uint8_t heartbeat_counter{0}, rsoc{0};
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
-    uint32_t connect_check_count{0};
+    uint32_t connect_check_count{0}, temperature_error_count{0};
     int adc_ch{2};
     bool adc_measure_mode{false}, temperature_error{false};
     static constexpr int ADDR{0b10010010};
