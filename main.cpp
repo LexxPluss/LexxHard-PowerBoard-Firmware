@@ -15,7 +15,7 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 EventQueue globalqueue;
 
 template<typename T>
-inline const T &constrain(const T &val, const T &min, const T &max)
+inline const T &clamp(const T &val, const T &min, const T &max)
 {
     return val < min ? min : (val > max ? max : val);
 }
@@ -333,17 +333,17 @@ public:
         send_heartbeat();
     }
     void get_connector_temperature(int &positive, int &negative) const {
-        positive = constrain(static_cast<int>(connector_temp[0]), 0, 255);
-        negative = constrain(static_cast<int>(connector_temp[1]), 0, 255);
+        positive = clamp(static_cast<int>(connector_temp[0]), 0, 255);
+        negative = clamp(static_cast<int>(connector_temp[1]), 0, 255);
     }
     uint32_t get_connector_voltage() const {
         int32_t voltage_mv{static_cast<int32_t>(connector_v * 1e+3f)};
-        return constrain(voltage_mv, 0L, 3300L);
+        return clamp(voltage_mv, 0L, 3300L);
     }
     uint32_t get_connect_check_count() const {return connect_check_count;}
     uint32_t get_heartbeat_delay() const {
         auto seconds{std::chrono::duration_cast<std::chrono::seconds>(heartbeat_timer.elapsed_time())};
-        return constrain(static_cast<uint32_t>(seconds.count()), 0UL, 255UL);
+        return clamp(static_cast<uint32_t>(seconds.count()), 0UL, 255UL);
     }
     bool is_temperature_error() const {return temperature_error;}
     void poll() {
@@ -1024,7 +1024,7 @@ private:
         watchdog.kick();
     }
     void poll_10s() {
-        uint8_t buf[8]{'1', '0', '5'}; // version
+        uint8_t buf[8]{'1', '0', '6'}; // version
         can.send(CANMessage{0x203, buf});
     }
     can_driver can;
