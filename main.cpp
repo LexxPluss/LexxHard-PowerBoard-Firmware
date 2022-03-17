@@ -578,12 +578,12 @@ public:
     void set_enable(bool enable) {
         if (enable) {
             // control[0].write(1);
-            control[2].write(1); // external 5V must be turned on first.
+            control[2].write(0); // external 5V must be turned on first.
             control[1].write(1);
         } else {
             control[1].write(0); // 16V must be turned off first.
             // control[0].write(0);
-            control[2].write(0);
+            control[2].write(1);
         }
     }
     bool is_ok() {
@@ -594,7 +594,7 @@ public:
         v16 = fail[1].read() == 0;
     }
 private:
-    DigitalOut control[3]{{PA_10, 0}, {PB_3, 0}, {PA_1, 0}};
+    DigitalOut control[3]{{PA_10, 0}, {PB_3, 0}, {PA_1, 1}};
     DigitalIn fail[2]{{PA_15}, {PB_4}};
 };
 
