@@ -431,9 +431,9 @@ private:
         float R{Rpu * adc_voltage / (3.3f - adc_voltage)};
         float T{1.0f / (logf(R / R0) / B + 1.0f / T0)};
         if (adc_ch == 0 || adc_ch == 2)
-            connector_temp[0] = connector_temp[0] * 0.5f + (T - 273.0f) * 0.5f;
+            connector_temp[0] = connector_temp[0] * 0.9f + (T - 273.0f) * 0.1f;
         else
-            connector_temp[1] = connector_temp[1] * 0.5f + (T - 273.0f) * 0.5f;
+            connector_temp[1] = connector_temp[1] * 0.9f + (T - 273.0f) * 0.1f;
     }
     bool is_connected() const {
         return connect_check_count >= CONNECT_THRES_COUNT;
@@ -565,7 +565,7 @@ public:
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
             int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
-            temperature = temperature * 0.5f + value / 128.0f * 0.5f;
+            temperature = temperature * 0.95f + value / 128.0f * 0.05f;
         }
     }
 private:
@@ -1024,7 +1024,7 @@ private:
         watchdog.kick();
     }
     void poll_10s() {
-        uint8_t buf[8]{'1', '0', '7'}; // version
+        uint8_t buf[8]{'1', '0', '8'}; // version
         can.send(CANMessage{0x203, buf});
     }
     can_driver can;
