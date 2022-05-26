@@ -346,12 +346,18 @@ public:
     }
     bool is_temperature_error() const {return temperature_error;}
     void poll() {
+        uint32_t prev_connect_check_count{connect_check_count};
         connector_v = connector.read_voltage();
         if (connector_v > CONNECT_THRES_VOLTAGE) {
-            if (++connect_check_count > CONNECT_THRES_COUNT)
+            if (++connect_check_count >= CONNECT_THRES_COUNT) {
                 connect_check_count = CONNECT_THRES_COUNT;
+                if (prev_connect_check_count < CONNECT_THRES_COUNT)
+                    LOG("connected to the charger.\n");
+            }
         } else {
             connect_check_count = 0;
+            if (prev_connect_check_count >= CONNECT_THRES_COUNT)
+                LOG("disconnected from the charger.\n");
         }
 #ifndef SERIAL_DEBUG
         while (serial.readable()) {
@@ -660,6 +666,9 @@ public:
     bool is_overheat() const {
         return mainboard_overheat || actuatorboard_overheat;
     }
+    bool is_wheel_poweroff() const {
+        return wheel_poweroff;
+    }
 private:
     void handle_can(const CANMessage &msg) {
         heartbeat_timeout = false;
@@ -670,13 +679,14 @@ private:
         ros_heartbeat_timeout = msg.data[2] != 0;
         mainboard_overheat = msg.data[3] != 0;
         actuatorboard_overheat = msg.data[4] != 0;
+        wheel_poweroff = msg.data[5] != 0;
         if (!ros_heartbeat_timeout)
             heartbeat_detect = true;
     }
     can_driver &can;
     Timer timer;
     bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false},
-         mainboard_overheat{false}, actuatorboard_overheat{false};
+         mainboard_overheat{false}, actuatorboard_overheat{false}, wheel_poweroff{false};
 };
 
 class state_controller {
@@ -712,6 +722,14 @@ private:
         LOCKDOWN,
     };
     void poll() {
+        auto wheel_relay_control = [&](){
+            bool wheel_poweroff{mbd.is_wheel_poweroff()};
+            if (last_wheel_poweroff != wheel_poweroff) {
+                last_wheel_poweroff = wheel_poweroff;
+                bat_out.write(wheel_poweroff ? 0 : 1);
+                LOG("wheel power control %d!\n", wheel_poweroff);
+            }
+        };
         can.poll();
         psw.poll();
         bsw.poll();
@@ -745,6 +763,7 @@ private:
             }
             break;
         case POWER_STATE::STANDBY: {
+            wheel_relay_control();
             auto psw_state{psw.get_state()};
             if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED) {
                 set_new_state(POWER_STATE::OFF);
@@ -782,6 +801,7 @@ private:
             break;
         }
         case POWER_STATE::NORMAL:
+            wheel_relay_control();
             if (psw.get_state() != power_switch::STATE::RELEASED) {
                 LOG("detect power switch\n");
                 set_new_state(POWER_STATE::STANDBY);
@@ -896,6 +916,7 @@ private:
         default:
             break;
         }
+        int bat_out_state{mbd.is_wheel_poweroff() ? 0 : 1};
         switch (newstate) {
         case POWER_STATE::OFF:
             LOG("enter OFF\n");
@@ -923,14 +944,14 @@ private:
             psw.set_led(true);
             dcdc.set_enable(true);
             wsw.set_disable(true);
-            bat_out.write(1);
+            bat_out.write(bat_out_state);
             ac.set_enable(false);
             wait_shutdown = false;
             break;
         case POWER_STATE::NORMAL:
             LOG("enter NORMAL\n");
             wsw.set_disable(false);
-            bat_out.write(1);
+            bat_out.write(bat_out_state);
             ac.set_enable(false);
             charge_guard_asserted = true;
             charge_guard_timeout.attach([this](){charge_guard_asserted = false;}, 10s);
@@ -1052,7 +1073,8 @@ private:
     } shutdown_reason{SHUTDOWN_REASON::NONE};
     Timer timer_post, timer_shutdown;
     Timeout current_check_timeout, charge_guard_timeout;
-    bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false}, charge_guard_asserted{false};
+    bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false}, charge_guard_asserted{false},
+         last_wheel_poweroff{false};
 };
 
 }
