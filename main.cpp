@@ -143,7 +143,6 @@ public:
             sw_bat.poll(changed);
             sw_unlock.poll(changed);
             if (changed) {
-                LOG("power_switch change to %d\n", now);
                 prev = now;
                 timer.reset();
                 timer.start();
