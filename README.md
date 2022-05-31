@@ -1,7 +1,7 @@
 # LexxPluss Power Board Software
 
-[![CI](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/main.yml/badge.svg)](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/main.yml)
-[![release](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/release.yml/badge.svg)](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/release.yml)
+[![CI](https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware/actions/workflows/main.yml/badge.svg)](https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware/actions/workflows/main.yml)
+[![release](https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware/actions/workflows/release.yml/badge.svg)](https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware/actions/workflows/release.yml)
 
 ## Install Mbed CLI 2 (mbed-tools).
 https://os.mbed.com/docs/mbed-os/v6.15/build-tools/install-or-upgrade.html
@@ -12,8 +12,8 @@ https://developer.arm.com/tools-and-software/open-source-software/developer-tool
 ## Build
 
 ```bash
-$ git clone https://github.com/LexxPluss/mbed-os-powerboard.git
-$ cd mbed-os-powerboard
+$ git clone https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware.git
+$ cd LexxHard-PowerBoard-Firmware
 $ mbed-tools deploy
 $ mbed-tools compile -m LEXXPLUSS_PB01 -t GCC_ARM
 ```
@@ -48,7 +48,7 @@ $ brew install stlink
 ### STLINK Tools (Open souce version)
 
 ```bash
-$ st-flash --connect-under-reset cmake_build/LEXXPLUSS_PB01/develop/GCC_ARM/mbed-os-powerboard.bin 0x8000000
+$ st-flash --connect-under-reset cmake_build/LEXXPLUSS_PB01/develop/GCC_ARM/LexxHard-PowerBoard-Firmware.bin 0x8000000
 ```
 
 ### STM32CubeProgrammer
