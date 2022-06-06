@@ -27,7 +27,7 @@
 
 class serial_message {
 public:
-    bool decode(uint8_t data) {
+    bool decode(uint8_t data) {       /*  */
         return decode_single(data);
     }
     bool decode(uint8_t *buf, int length) {
@@ -44,7 +44,7 @@ public:
         return request.detail.command;
     }
     static void compose(uint8_t buf[8], uint8_t command, uint8_t *param) {
-        buf[0] = 'L';
+        buf[0] = 'L'; // L and P creates the header of the communication protocol
         buf[1] = 'P';
         buf[2] = command;
         if (param != nullptr) {
@@ -56,7 +56,7 @@ public:
         }
         uint16_t sum{calc_check_sum(buf, 6)};
         buf[6] = sum;
-        buf[7] = sum >> 8;
+        buf[7] = sum >> 8; // This confirms that the message have been received correctly on the other end of teh communication by reverting and confirming the sum operation.
     }
     void reset() {state = STATE::HEAD0;}
     static constexpr uint8_t HEARTBEAT{0x01};

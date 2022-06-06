@@ -37,6 +37,22 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 #define LOG(...) logger.print(__VA_ARGS__)
 #endif
 
+// Declaring the name and function of the STM32F103 GPIO.
+
+PinName can_tx{PA_11}, can_rx{PA_12}; // Can associated pins
+PinName sw_in{PB_0}, led_out{PB_13}; // Power Switch handler associated pins
+PinName bp_left{PA_4}, bp_right{PA_5}; // Bumper Switch associated pins 
+PinName es_leftP{PA_6}, es_right{PA_7}; // Emergency Switch associated pins
+PinName wh_leftP{PB_8}, wh_right{PB_9}; // Wheel switch associated pins 
+PinName mc_din{PB_10}; // Manual charging detection associated pins 
+PinName ac_th_pos{PB_7}, ac_th_neg{PB_6}, ac_IrDA_tx{PA_2}, ac_IrDA_rx{PA_3}, ac_analogVol{PB_1}, ac_chargingRelay{PB_2}; // Auto charging detection associated pins
+PinName bmu_main_sw{PB_11}, bmu_c_fet{PB_14}, bmu_d_fet{PB_15}, bmu_p_dsg{PA_9}; // BMU controller associated pins
+PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors associated I2C pins
+PinName dcdc_control_16v{PA_10}, dcdc_control_5v{PB_3}, dcdc_control_33v{PA_1}, dcdc_failSignal_16v{PA_15}, dcdc_failSignal_5v{PB_4}; // DC-DC related control and fail signal pins
+PinName fan_pwm{PA_8}; // PWM fan signal control pin
+PinName sc_bat_out{PB_5}, sc_hb_led{PB_12} // State controller associated pins
+  
+
 EventQueue globalqueue;
 
 template<typename T>
@@ -45,7 +61,7 @@ inline const T &clamp(const T &val, const T &min, const T &max)
     return val < min ? min : (val > max ? max : val);
 }
 
-class can_callback {
+class can_callback { // No pins declared
 public:
     void register_callback(uint32_t msgid, Callback<void(const CANMessage &msg)> func) {
         if (count < NUM) {
@@ -91,12 +107,12 @@ public:
         can.write(msg);
     }
 private:
-    CAN can{PA_11, PA_12};
+    CAN can{PA_11, PA_12}; // Can pins
     can_callback callback;
     int filter_handle{0};
 };
 
-class log_printer {
+class log_printer { // No pins declared
 public:
     void set_can_driver(can_driver *can) {
         this->can = can;
@@ -120,7 +136,7 @@ private:
     char buffer[128];
 } logger;
 
-class power_switch_handler {
+class power_switch_handler {  // No pins declared
 public:
     power_switch_handler(int thres) : thres(thres * 2) {
         timer.start();
@@ -206,8 +222,8 @@ public:
     }
 private:
     power_switch_handler sw_bat{2}, sw_unlock{10};
-    DigitalIn sw{PB_0};
-    DigitalOut led{PB_13, 0};
+    DigitalIn sw{PB_0};  // Search pins
+    DigitalOut led{PB_13, 0}; // Search pins
     Timer timer;
     STATE state{STATE::RELEASED};
     uint32_t count{0};
@@ -234,7 +250,7 @@ public:
 #endif
     }
 private:
-    DigitalIn left{PA_4}, right{PA_5};
+    DigitalIn left{PA_4}, right{PA_5}; // Search pins
     Timeout timeout;
     bool asserted{false};
 };
@@ -271,7 +287,7 @@ public:
         right = right_asserted;
     }
 private:
-    DigitalIn left{PA_6}, right{PA_7};
+    DigitalIn left{PA_6}, right{PA_7}; // Search pins
     uint32_t left_count{0}, right_count{0};
     int left_prev{-1}, right_prev{-1};
     bool left_asserted{false}, right_asserted{false};
@@ -294,7 +310,7 @@ public:
         right = this->right.read() == 1;
     }
 private:
-    DigitalOut left{PB_8, 0}, right{PB_9, 0};
+    DigitalOut left{PB_8, 0}, right{PB_9, 0}; // Search pins
 };
 
 class manual_charger {
@@ -328,7 +344,7 @@ private:
         }
         plugged = plugped_count > 5;
     }
-    DigitalIn din{PB_10};
+    DigitalIn din{PB_10}; // Search pins
     Timer timer;
     int prev{1};
     bool plugged{false};
@@ -404,7 +420,7 @@ public:
     void update_rsoc(uint8_t rsoc) {
         this->rsoc = rsoc;
     }
-private:
+private: // Thermistor side starts here.
     void adc_ticktock() {
         if (adc_measure_mode) {
             adc_read();
@@ -415,10 +431,10 @@ private:
             adc_measure_mode = true;
         }
     }
-    void adc_read() {
+    void adc_read() { // Change to read the temperature sensor from ADC pin directly. Thermistor side.
         uint8_t buf[2];
         buf[0] = 0b00000000; // Conversion Register
-        I2C i2c{PB_7, PB_6};
+        I2C i2c{PB_7, PB_6}; // Search pins
         i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
@@ -446,7 +462,7 @@ private:
         case 2: buf[1] |= 0b01100000; break;
         case 3: buf[1] |= 0b01110000; break;
         }
-        I2C i2c{PB_7, PB_6};
+        I2C i2c{PB_7, PB_6}; // Search pins
         i2c.frequency(400000);
         i2c.write(ADDR, reinterpret_cast<const char*>(buf), sizeof buf);
     }
@@ -472,22 +488,22 @@ private:
     bool is_overheat() const {
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
     }
-    void poll_1s() {
+    void poll_1s() {                                                         /* Function that checks the conditions of charging while the IrDA is connected */
         if (is_connected() && !temperature_error && !is_overheat())
             send_heartbeat();
     }
-    void send_heartbeat() {
-        uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read()), rsoc};
+    void send_heartbeat() {                                                    /* Creates the message to send to the robot using the "compose" function below */
+        uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read()), rsoc}; // Message composed of 8 bytes, 3 bytes parameters -- Declaration
         serial_message::compose(buf, serial_message::HEARTBEAT, param);
 #ifndef SERIAL_DEBUG
         serial.write(buf, sizeof buf);
 #endif
-    }
+    } // Declaration of variables
 #ifndef SERIAL_DEBUG
-    BufferedSerial serial{PA_2, PA_3};
+    BufferedSerial serial{PA_2, PA_3}; // IrDA serial pins
 #endif
-    AnalogIn connector{PB_1, 3.3f};
-    DigitalOut sw{PB_2, 0};
+    AnalogIn connector{PB_1, 3.3f}; // Charging connector pin 0 - 24V. (3.3f max voltage reference - map voltage between 0 - 3.3V)
+    DigitalOut sw{PB_2, 0}; // declare the robot auto Charging relay pin!!
     Timer heartbeat_timer, serial_timer;
     serial_message msg;
     uint8_t heartbeat_counter{0}, rsoc{0};
@@ -495,7 +511,7 @@ private:
     uint32_t connect_check_count{0}, temperature_error_count{0};
     int adc_ch{2};
     bool adc_measure_mode{false}, temperature_error{false};
-    static constexpr int ADDR{0b10010010};
+    static constexpr int ADDR{0b10010010}; // I2C adress for temp sensor
     static constexpr uint32_t CONNECT_THRES_COUNT{100};
     static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
                            CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)};
@@ -552,8 +568,8 @@ private:
         }
     }
     can_driver &can;
-    DigitalOut main_sw{PB_11, 0};
-    DigitalIn c_fet{PB_14}, d_fet{PB_15}, p_dsg{PA_9};
+    DigitalOut main_sw{PB_11, 0}; // Main switch pin
+    DigitalIn c_fet{PB_14}, d_fet{PB_15}, p_dsg{PA_9}; // Search pins
     struct {
         int16_t pack_a{0};
         uint16_t pack_v{0};
@@ -567,7 +583,7 @@ public:
     void init() {
         uint8_t buf[2];
         buf[0] = 0x0b; // ID Register
-        I2C i2c{PB_7, PB_6};
+        I2C i2c{PB_7, PB_6}; // Search I2C pins for the temp sensor.
         i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 1) == 0 &&
@@ -591,7 +607,7 @@ public:
     void poll() {
         uint8_t buf[2];
         buf[0] = 0x00; // Temperature Value MSB Register
-        I2C i2c{PB_7, PB_6};
+        I2C i2c{PB_7, PB_6};  // Search I2C pins for the temp sensor.
         i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
@@ -626,8 +642,8 @@ public:
         v16 = fail[1].read() == 0;
     }
 private:
-    DigitalOut control[3]{{PA_10, 0}, {PB_3, 0}, {PA_1, 1}};
-    DigitalIn fail[2]{{PA_15}, {PB_4}};
+    DigitalOut control[3]{{PA_10, 0}, {PB_3, 0}, {PA_1, 1}}; // Search pins
+    DigitalIn fail[2]{{PA_15}, {PB_4}};  // Search pins
 };
 
 class fan_driver {
@@ -659,11 +675,11 @@ public:
         return pwm.read_pulsewitdth_us() * CONTROL_HZ * 100 / 1000000;
     }
 private:
-    PwmOut pwm{PA_8};
+    PwmOut pwm{PA_8}; // Search pins
     static constexpr int CONTROL_HZ{5000};
 };
 
-class mainboard_controller {
+class mainboard_controller {  // No pins declared
 public:
     mainboard_controller(can_driver &can) : can(can) {}
     void init() {
@@ -1094,7 +1110,7 @@ private:
     dcdc_converter dcdc;
     fan_driver fan;
     mainboard_controller mbd{can};
-    DigitalOut bat_out{PB_5, 0}, heartbeat_led{PB_12, 0};
+    DigitalOut bat_out{PB_5, 0}, heartbeat_led{PB_12, 0}; // Search pins
     POWER_STATE state{POWER_STATE::OFF};
     enum class SHUTDOWN_REASON {
         NONE,
