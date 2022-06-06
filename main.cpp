@@ -38,19 +38,36 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 #endif
 
 // Declaring the name and function of the STM32F103 GPIO.
+// Old pinOut declaration
 
-PinName can_tx{PA_11}, can_rx{PA_12}; // Can associated pins
-PinName sw_in{PB_0}, led_out{PB_13}; // Power Switch handler associated pins
-PinName bp_left{PA_4}, bp_right{PA_5}; // Bumper Switch associated pins 
-PinName es_leftP{PA_6}, es_right{PA_7}; // Emergency Switch associated pins
-PinName wh_leftP{PB_8}, wh_right{PB_9}; // Wheel switch associated pins 
-PinName mc_din{PB_10}; // Manual charging detection associated pins 
-PinName ac_th_pos{PB_7}, ac_th_neg{PB_6}, ac_IrDA_tx{PA_2}, ac_IrDA_rx{PA_3}, ac_analogVol{PB_1}, ac_chargingRelay{PB_2}; // Auto charging detection associated pins
-PinName bmu_main_sw{PB_11}, bmu_c_fet{PB_14}, bmu_d_fet{PB_15}, bmu_p_dsg{PA_9}; // BMU controller associated pins
-PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors associated I2C pins
-PinName dcdc_control_16v{PA_10}, dcdc_control_5v{PB_3}, dcdc_control_33v{PA_1}, dcdc_failSignal_16v{PA_15}, dcdc_failSignal_5v{PB_4}; // DC-DC related control and fail signal pins
-PinName fan_pwm{PA_8}; // PWM fan signal control pin
-PinName sc_bat_out{PB_5}, sc_hb_led{PB_12} // State controller associated pins
+/*Confirmed*/ //PinName can_tx{PA_11}, can_rx{PA_12}; // Can associated pins
+/*Confirmed*/ //PinName ps_sw_in{PB_0}, ps_led_out{PB_13}; // Power Switch handler associated pins
+/*Confirmed, only one used*/ //PinName bp_left{PA_4}, bp_right{PA_5}; // Bumper Switch associated pins
+/*Confirmed*/ //PinName es_left{PA_6}, es_right{PA_7}; // Emergency Switch associated pins
+/*Confirmed*/ //PinName wh_left{PB_8}, wh_right{PB_9}; // Wheel switch associated pins 
+/*Confirmed*/ //PinName mc_din{PB_10}; // Manual charging detection associated pins 
+/*Confirmed*/ //PinName /*{ac_th_pos{PB_7}, ac_th_neg{PB_6},} Change for ADC pins*/ ac_IrDA_tx{PA_2}, ac_IrDA_rx{PA_3}, ac_analogVol{PB_1}, ac_chargingRelay{PB_2}; // Auto charging detection associated pins
+/*Confirmed*/ //PinName bmu_main_sw{PB_11}, bmu_c_fet{PB_14}, bmu_d_fet{PB_15}, bmu_p_dsg{PA_9}; // BMU controller associated pins
+/*Confirmed*/ //PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors x3 associated to the same I2C pins
+/*Confirmed*/ //PinName dcdc_control_16v{PA_10}, dcdc_control_5v{PB_3}, /*{dcdc_control_33v{PA_1}}, not used as well as PA_0*/, dcdc_failSignal_16v{PA_15}, dcdc_failSignal_5v{PB_4}; // DC-DC related control and fail signal pins
+/*Confirmed*/ //PinName fan_pwm{PA_8}; // PWM fan signal control pin
+/*Confirmed*/ //PinName sc_bat_out{PB_5}, sc_hb_led{PB_12}; /*{sc_hb_led{PB_12}}, not implemented in the circuit, but required*/ // State controller associated pins
+
+
+// Declaring NEW pinOut for STM32F103 GPIO.
+
+/*Switched*/ PinName can_tx{PA_12}, can_rx{PA_11}; // Can associated pins
+/*Half-Changed*/ PinName ps_sw_in{PB_0}, ps_led_out{PB_12}; // Power Switch handler associated pins
+/*Changed*/ PinName bp_left{PA_4}; // Bumper Switch associated pins 
+/*Same*/ PinName es_left{PA_6}, es_right{PA_7}; // Emergency Switch associated pins
+/*Same*/ PinName wh_left{PB_8}, wh_right{PB_9}; // Wheel switch associated pins 
+/*Same*/ PinName mc_din{PB_10}; // Manual charging detection associated pins 
+/*Th pins changed*/ PinName ac_th_pos{PA_0}, ac_th_neg{PA_1}, ac_IrDA_tx{PA_2}, ac_IrDA_rx{PA_3}, ac_analogVol{PB_1}, ac_chargingRelay{PB_2}; // Auto charging detection associated pins
+/*Changed (not PB_11)*/ PinName bmu_main_sw{PB_11}, bmu_c_fet{PB_13}, bmu_d_fet{PB_14}, bmu_p_dsg{PB_15}; // BMU controller associated pins
+/*Same*/ PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors associated I2C pins
+/*Switched*/ PinName dcdc_control_16v{PB_3}, dcdc_control_5v{PA_10}, dcdc_failSignal_16v{PB_4}, dcdc_failSignal_5v{PA_15}; // DC-DC related control and fail signal pins
+/*Same*/ PinName fan_pwm{PA_8}; // PWM fan signal control pin
+/*Same*/ PinName sc_bat_out{PB_5}, sc_hb_led{PB_12} // State controller associated pins
   
 
 EventQueue globalqueue;
@@ -88,7 +105,7 @@ private:
     } callbacks[NUM];
 };
 
-class can_driver {
+class can_driver { // Variables Implemented
 public:
     can_driver() {
         can.frequency(500000);
@@ -107,7 +124,7 @@ public:
         can.write(msg);
     }
 private:
-    CAN can{PA_11, PA_12}; // Can pins
+    CAN can{can_rx, can_tx};
     can_callback callback;
     int filter_handle{0};
 };
@@ -161,7 +178,7 @@ private:
     bool activated{false};
 };
 
-class power_switch {
+class power_switch { // Variables Implemented
 public:
     enum class STATE {
         RELEASED, PUSHED, LONG_PUSHED,
@@ -222,8 +239,8 @@ public:
     }
 private:
     power_switch_handler sw_bat{2}, sw_unlock{10};
-    DigitalIn sw{PB_0};  // Search pins
-    DigitalOut led{PB_13, 0}; // Search pins
+    DigitalIn sw{ps_sw_in};
+    DigitalOut led{ps_led_out, 0};
     Timer timer;
     STATE state{STATE::RELEASED};
     uint32_t count{0};
@@ -231,7 +248,7 @@ private:
     static constexpr uint32_t COUNT{1};
 };
 
-class bumper_switch {
+class bumper_switch { // Variables Implemented
 public:
     void poll() {
         if (left.read() == 0 || right.read() == 0) {
@@ -250,12 +267,12 @@ public:
 #endif
     }
 private:
-    DigitalIn left{PA_4}, right{PA_5}; // Search pins
+    DigitalIn left{bp_left}; 
     Timeout timeout;
     bool asserted{false};
 };
 
-class emergency_switch {
+class emergency_switch { // Variables Implemented
 public:
     void poll() {
         int now{left.read()};
@@ -287,14 +304,14 @@ public:
         right = right_asserted;
     }
 private:
-    DigitalIn left{PA_6}, right{PA_7}; // Search pins
+    DigitalIn left{es_left}, right{es_right}; 
     uint32_t left_count{0}, right_count{0};
     int left_prev{-1}, right_prev{-1};
     bool left_asserted{false}, right_asserted{false};
     static constexpr uint32_t COUNT{5};
 };
 
-class wheel_switch {
+class wheel_switch { // Variables Implemented
 public:
     void set_disable(bool disable) {
         if (disable) {
@@ -310,10 +327,10 @@ public:
         right = this->right.read() == 1;
     }
 private:
-    DigitalOut left{PB_8, 0}, right{PB_9, 0}; // Search pins
+    DigitalOut left{wh_left, 0}, right{wh_right, 0};
 };
 
-class manual_charger {
+class manual_charger { // Variables Implemented
 public:
     void init() {
         setup_first_state();
@@ -344,13 +361,13 @@ private:
         }
         plugged = plugped_count > 5;
     }
-    DigitalIn din{PB_10}; // Search pins
+    DigitalIn din{mc_din};
     Timer timer;
     int prev{1};
     bool plugged{false};
 };
 
-class auto_charger {
+class auto_charger { // Variables Half-Implemented (Not Thermistors ADC)
 public:
     void init() {
 #ifndef SERIAL_DEBUG
@@ -500,10 +517,10 @@ private: // Thermistor side starts here.
 #endif
     } // Declaration of variables
 #ifndef SERIAL_DEBUG
-    BufferedSerial serial{PA_2, PA_3}; // IrDA serial pins
+    BufferedSerial serial{ac_IrDA_tx, ac_IrDA_rx}; // IrDA serial pins
 #endif
-    AnalogIn connector{PB_1, 3.3f}; // Charging connector pin 0 - 24V. (3.3f max voltage reference - map voltage between 0 - 3.3V)
-    DigitalOut sw{PB_2, 0}; // declare the robot auto Charging relay pin!!
+    AnalogIn connector{ac_analogVol, 3.3f}; // Charging connector pin 0 - 24V. (3.3f max voltage reference - map voltage between 0 - 3.3V)
+    DigitalOut sw{ac_chargingRelay, 0}; // declare the robot auto Charging relay pin!!
     Timer heartbeat_timer, serial_timer;
     serial_message msg;
     uint8_t heartbeat_counter{0}, rsoc{0};
@@ -517,7 +534,7 @@ private: // Thermistor side starts here.
                            CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)};
 };
 
-class bmu_controller {
+class bmu_controller { // Variables Implemented
 public:
     bmu_controller(can_driver &can) : can(can) {}
     void init() {
@@ -568,9 +585,9 @@ private:
         }
     }
     can_driver &can;
-    DigitalOut main_sw{PB_11, 0}; // Main switch pin
-    DigitalIn c_fet{PB_14}, d_fet{PB_15}, p_dsg{PA_9}; // Search pins
-    struct {
+    DigitalOut main_sw{bmu_main_sw, 0}; // Main switch pin
+    DigitalIn c_fet{bmu_c_fet}, d_fet{bmu_d_fet}, p_dsg{bmu_p_dsg}; 
+        struct {
         int16_t pack_a{0};
         uint16_t pack_v{0};
         uint8_t mod_status1{0xff}, mod_status2{0xff}, bmu_alarm1{0xff}, bmu_alarm2{0xff};
@@ -578,12 +595,12 @@ private:
     } data;
 };
 
-class temperature_sensor {
+class temperature_sensor { // Variables Implemented
 public:
     void init() {
         uint8_t buf[2];
         buf[0] = 0x0b; // ID Register
-        I2C i2c{PB_7, PB_6}; // Search I2C pins for the temp sensor.
+        I2C i2c{ts_i2c_sda, ts_i2c_scl}; 
         i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 1) == 0 &&
@@ -607,7 +624,7 @@ public:
     void poll() {
         uint8_t buf[2];
         buf[0] = 0x00; // Temperature Value MSB Register
-        I2C i2c{PB_7, PB_6};  // Search I2C pins for the temp sensor.
+        I2C i2c{ts_i2c_sda, ts_i2c_scl};  
         i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
@@ -621,7 +638,7 @@ private:
     static constexpr int ADDR{0b10010000};
 };
 
-class dcdc_converter {
+class dcdc_converter { // Variables Implemented
 public:
     void set_enable(bool enable) {
         if (enable) {
@@ -642,11 +659,11 @@ public:
         v16 = fail[1].read() == 0;
     }
 private:
-    DigitalOut control[3]{{PA_10, 0}, {PB_3, 0}, {PA_1, 1}}; // Search pins
-    DigitalIn fail[2]{{PA_15}, {PB_4}};  // Search pins
+    DigitalOut control[3]{{dcdc_control_5v, 0}, {dcdc_control_16v, 0}}; 
+    DigitalIn fail[2]{dcdc_failSignal_5v, dcdc_failSignal_16v}; 
 };
 
-class fan_driver {
+class fan_driver { // Variables Implemented
 public:
     void init() {
         pwm.period_us(1000000 / CONTROL_HZ);
@@ -675,7 +692,7 @@ public:
         return pwm.read_pulsewitdth_us() * CONTROL_HZ * 100 / 1000000;
     }
 private:
-    PwmOut pwm{PA_8}; // Search pins
+    PwmOut pwm{fan_pwm}; 
     static constexpr int CONTROL_HZ{5000};
 };
 
@@ -733,7 +750,7 @@ private:
          mainboard_overheat{false}, actuatorboard_overheat{false}, wheel_poweroff{false};
 };
 
-class state_controller {
+class state_controller { // Variables Implemented
 public:
     void init() {
         mc.init();
@@ -1110,7 +1127,7 @@ private:
     dcdc_converter dcdc;
     fan_driver fan;
     mainboard_controller mbd{can};
-    DigitalOut bat_out{PB_5, 0}, heartbeat_led{PB_12, 0}; // Search pins
+    DigitalOut bat_out{sc_bat_out, 0}, heartbeat_led{sc_hb_led, 0};
     POWER_STATE state{POWER_STATE::OFF};
     enum class SHUTDOWN_REASON {
         NONE,
