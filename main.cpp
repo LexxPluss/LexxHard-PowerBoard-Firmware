@@ -68,6 +68,7 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 /*Switched*/ PinName dcdc_control_16v{PB_3}, dcdc_control_5v{PA_10}, dcdc_failSignal_16v{PB_4}, dcdc_failSignal_5v{PA_15}; // DC-DC related control and fail signal pins
 /*Same*/ PinName fan_pwm{PA_8}; // PWM fan signal control pin
 /*Same*/ PinName sc_bat_out{PB_5}, sc_hb_led{PB_12} // State controller associated pins
+PinName main_MCU_ON{PA_5}; // Pin controlling the MainMCU power-up
   
 
 EventQueue globalqueue;
@@ -405,7 +406,7 @@ public:
     bool is_temperature_error() const {return temperature_error;}
     void poll() {
         uint32_t prev_connect_check_count{connect_check_count};
-        connector_v = connector.read_voltage();
+        connector_v = connector.read_voltage();  // Read the voltage from the auto charging terminals 
         if (connector_v > CONNECT_THRES_VOLTAGE) {
             if (++connect_check_count >= CONNECT_THRES_COUNT) {
                 connect_check_count = CONNECT_THRES_COUNT;
@@ -438,7 +439,7 @@ public:
         this->rsoc = rsoc;
     }
 private: // Thermistor side starts here.
-    void adc_ticktock() {
+    void adc_ticktock() { // Not used
         if (adc_measure_mode) {
             adc_read();
             adc_ch = adc_ch == 2 ? 3 : 2;
@@ -449,6 +450,7 @@ private: // Thermistor side starts here.
         }
     }
     void adc_read() { // Change to read the temperature sensor from ADC pin directly. Thermistor side.
+        /*
         uint8_t buf[2];
         buf[0] = 0b00000000; // Conversion Register
         I2C i2c{PB_7, PB_6}; // Search pins
@@ -457,7 +459,7 @@ private: // Thermistor side starts here.
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
             int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
             float voltage{static_cast<float>(value) / 32768.0f * 4.096f};
-            calculate_temperature(voltage);
+
             temperature_error_count = 0;
             temperature_error = false;
         } else {
@@ -466,8 +468,16 @@ private: // Thermistor side starts here.
                 temperature_error = true;
             }
         }
+        */
+
+        float v_th_pos{therm_pos.read_voltage() / 32768.0f * 4.096f} // Read the positive thermistor voltage
+        float v_th_neg{therm_pos.read_voltage() / 32768.0f * 4.096f} // Read the negative thermistor voltage
+
+        calculate_temperature(v_th_pos, 0); // Calculate the thermistor PLUS temperature
+        calculate_temperature(v_th_neg, 1); // Calculate the thermistor MINUS temperature
+
     }
-    void adc_measure() const {
+    void adc_measure() const { // Not used
         uint8_t buf[3];
         buf[0] = 0b00000001; // Config Register
         buf[1] = 0b10000011; // Start, FSR4.096V, Single
@@ -483,8 +493,10 @@ private: // Thermistor side starts here.
         i2c.frequency(400000);
         i2c.write(ADDR, reinterpret_cast<const char*>(buf), sizeof buf);
     }
-    void calculate_temperature(float adc_voltage) {
-        if (adc_voltage > 3.29999f)
+
+    /*
+    void calculate_temperature(float adc_voltage) { // Do not touch
+        if (adc_voltage > 3.29999f) //adc_voltage (float)
             adc_voltage = 3.29999f;
         if (adc_voltage < 0.0f)
             adc_voltage = 0.0f;
@@ -493,11 +505,22 @@ private: // Thermistor side starts here.
         float Rpu{adc_ch < 2 ? 27000.0f : 10000.0f};
         float R{Rpu * adc_voltage / (3.3f - adc_voltage)};
         float T{1.0f / (logf(R / R0) / B + 1.0f / T0)};
-        static constexpr float gain{0.02f};
+        static constexpr float gain{0.02f}; // Low pass filter gain
         if (adc_ch == 0 || adc_ch == 2)
-            connector_temp[0] = connector_temp[0] * (1.0f - gain) + (T - 273.0f) * gain;
+            connector_temp[0] = connector_temp[0] * (1.0f - gain) + (T - 273.0f) * gain; // Low pass filter function
         else
             connector_temp[1] = connector_temp[1] * (1.0f - gain) + (T - 273.0f) * gain;
+    }
+    */
+    void calculate_temperature(float adc_voltage, uint8_t sensor) { // Changed version for direct ADC measurements
+        adc_voltage = clamp(adc_voltage, 0.0f, 3.29999f); // Clamp the value of the adc voltage received
+        // see https://lexxpluss.esa.io/posts/459
+        static constexpr float R0{3300.0f}, B{3970.0f}, T0{373.0f};
+        float Rpu{10000.0f};
+        float R{Rpu * adc_voltage / (3.3f - adc_voltage)};
+        float T{1.0f / (logf(R / R0) / B + 1.0f / T0)};
+        static constexpr float gain{0.02f}; // Low pass filter gain
+        connector_temp[sensor] = connector_temp[sensor] * (1.0f - gain) + (T - 273.0f) * gain; // Low pass filter function
     }
     bool is_connected() const {
         return connect_check_count >= CONNECT_THRES_COUNT;
@@ -520,6 +543,8 @@ private: // Thermistor side starts here.
     BufferedSerial serial{ac_IrDA_tx, ac_IrDA_rx}; // IrDA serial pins
 #endif
     AnalogIn connector{ac_analogVol, 3.3f}; // Charging connector pin 0 - 24V. (3.3f max voltage reference - map voltage between 0 - 3.3V)
+    AnalogIn therm_pos{ac_th_pos, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
+    AnalogIn therm_neg{ac_th_neg, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
     DigitalOut sw{ac_chargingRelay, 0}; // declare the robot auto Charging relay pin!!
     Timer heartbeat_timer, serial_timer;
     serial_message msg;
@@ -529,9 +554,9 @@ private: // Thermistor side starts here.
     int adc_ch{2};
     bool adc_measure_mode{false}, temperature_error{false};
     static constexpr int ADDR{0b10010010}; // I2C adress for temp sensor
-    static constexpr uint32_t CONNECT_THRES_COUNT{100};
-    static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
-                           CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)};
+    static constexpr uint32_t CONNECT_THRES_COUNT{100}; // Number of times that ...
+    static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)}, 
+                           CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)}; //
 };
 
 class bmu_controller { // Variables Implemented
@@ -640,15 +665,15 @@ private:
 
 class dcdc_converter { // Variables Implemented
 public:
-    void set_enable(bool enable) {
-        if (enable) {
-            // control[0].write(1);
-            control[2].write(0); // external 5V must be turned on first.
-            control[1].write(1);
+    void set_enable(bool enable) { 
+        if (enable) {               // In this configuration 0=OFF, 1=ON
+            control[0].write(1);    // external 5V must be turned on first.
+            control[1].write(1); 
+            control[2].write(1);    // control[2] controls the relay that powers ON the main MCU
         } else {
-            control[1].write(0); // 16V must be turned off first.
-            // control[0].write(0);
-            control[2].write(1);
+            control[1].write(0);    // 16V must be turned off first.
+            control[0].write(0);
+            control[2].write(0);
         }
     }
     bool is_ok() {
@@ -659,7 +684,7 @@ public:
         v16 = fail[1].read() == 0;
     }
 private:
-    DigitalOut control[3]{{dcdc_control_5v, 0}, {dcdc_control_16v, 0}}; 
+    DigitalOut control[3]{{dcdc_control_5v, 0}, {dcdc_control_16v, 0}, {main_MCU_ON, 0}}; 
     DigitalIn fail[2]{dcdc_failSignal_5v, dcdc_failSignal_16v}; 
 };
 
