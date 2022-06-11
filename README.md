@@ -123,3 +123,7 @@ Power Board Log Message (Published from Power Board)
 | byte offset | info | detail |
 |---|---|---|
 | 0-7 | message | NULL terminate string |
+
+## License
+
+Copyright (c) 2022, LexxPluss Inc. Released under the [BSD License](LICENSE).
