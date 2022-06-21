@@ -67,7 +67,7 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 /*Same*/ PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors associated I2C pins
 /*Switched*/ PinName dcdc_control_16v{PB_3}, dcdc_control_5v{PA_10}, dcdc_failSignal_16v{PB_4}, dcdc_failSignal_5v{PA_15}; // DC-DC related control and fail signal pins
 /*Same*/ PinName fan_pwm{PA_8}; // PWM fan signal control pin
-/*Same*/ PinName sc_bat_out{PB_5}, sc_hb_led{PB_12} // State controller associated pins
+/*Same*/ PinName sc_bat_out{PB_5}, sc_hb_led{PA_9} // State controller associated pins
 PinName main_MCU_ON{PA_5}; // Pin controlling the MainMCU power-up
   
 
@@ -636,7 +636,8 @@ public:
         }
     }
     bool is_ok() const {
-        return temperature < 80.0f;
+        //return temperature < 80.0f;
+        return true;
     }
     int get_temperature() const {
         if (temperature > 127.0f)
