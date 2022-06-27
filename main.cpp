@@ -649,6 +649,9 @@ public:
             duty_percent = duty_h;
         else
             duty_percent = A * (temperature - temp_l) + duty_l; // Linearly interpolate between temp_l and temp_h.
+        control_by_duty(duty_percent);
+    }
+    void control_by_duty(int duty_percent) {
         int pulsewidth{duty_percent * 1000000 / 100 / CONTROL_HZ};
         pwm.pulsewidth_us(pulsewidth);
     }
@@ -1004,7 +1007,12 @@ private:
     }
     void poll_100ms() {
         auto temperature{temp.get_temperature()};
-        fan.control_by_temperature(temperature);
+        if (state == POWER_STATE::AUTO_CHARGE ||
+            state == POWER_STATE::MANUAL_CHARGE) {
+            fan.control_by_duty(100);
+        } else {
+            fan.control_by_temperature(temperature);
+        }
         uint8_t buf[8]{0};
         if (psw.get_raw_state())
             buf[0] |= 0b00000001;
