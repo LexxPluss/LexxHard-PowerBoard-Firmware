@@ -637,7 +637,7 @@ public:
         pwm.pulsewidth_us(0);
     }
     void control_by_temperature(float temperature) {
-        static constexpr float temp_min{15.0f}, temp_l{30.0f}, temp_h{50.0f};
+        static constexpr float temp_min{15.0f}, temp_l{20.0f}, temp_h{30.0f};
         static constexpr int duty_l{10}, duty_h{100};
         static constexpr float A{(duty_h - duty_l) / (temp_h - temp_l)};
         int duty_percent;
