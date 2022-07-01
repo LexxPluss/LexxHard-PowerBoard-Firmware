@@ -1079,7 +1079,7 @@ private:
         watchdog.kick();
     }
     void poll_10s() {
-        uint8_t buf[8]{'1', '1', '1'}; // version
+        uint8_t buf[8]{'1', '1', '2'}; // version
         can.send(CANMessage{0x203, buf});
     }
     can_driver can;
