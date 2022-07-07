@@ -1,16 +1,16 @@
 /*
  * Copyright (c) 2022, LexxPluss Inc.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright notice,
  *    this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
  *    and/or other materials provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -44,8 +44,8 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 /*Confirmed*/ //PinName ps_sw_in{PB_0}, ps_led_out{PB_13}; // Power Switch handler associated pins
 /*Confirmed, only one used*/ //PinName bp_left{PA_4}, bp_right{PA_5}; // Bumper Switch associated pins
 /*Confirmed*/ //PinName es_left{PA_6}, es_right{PA_7}; // Emergency Switch associated pins
-/*Confirmed*/ //PinName wh_left{PB_8}, wh_right{PB_9}; // Wheel switch associated pins 
-/*Confirmed*/ //PinName mc_din{PB_10}; // Manual charging detection associated pins 
+/*Confirmed*/ //PinName wh_left{PB_8}, wh_right{PB_9}; // Wheel switch associated pins
+/*Confirmed*/ //PinName mc_din{PB_10}; // Manual charging detection associated pins
 /*Confirmed*/ //PinName /*{ac_th_pos{PB_7}, ac_th_neg{PB_6},} Change for ADC pins*/ ac_IrDA_tx{PA_2}, ac_IrDA_rx{PA_3}, ac_analogVol{PB_1}, ac_chargingRelay{PB_2}; // Auto charging detection associated pins
 /*Confirmed*/ //PinName bmu_main_sw{PB_11}, bmu_c_fet{PB_14}, bmu_d_fet{PB_15}, bmu_p_dsg{PA_9}; // BMU controller associated pins
 /*Confirmed*/ //PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors x3 associated to the same I2C pins
@@ -58,10 +58,10 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 
 /*Switched*/ PinName can_tx{PA_12}, can_rx{PA_11}; // Can associated pins
 /*Half-Changed*/ PinName ps_sw_in{PB_0}, ps_led_out{PB_12}; // Power Switch handler associated pins
-/*Changed*/ PinName bp_left{PA_4}; // Bumper Switch associated pins 
+/*Changed*/ PinName bp_left{PA_4}; // Bumper Switch associated pins
 /*Same*/ PinName es_left{PA_6}, es_right(PA_7); // Emergency Switch associated pins
-/*Same*/ PinName wh_left{PB_8}, wh_right{PB_9}; // Wheel switch associated pins 
-/*Same*/ PinName mc_din{PB_10}; // Manual charging detection associated pins 
+/*Same*/ PinName wh_left{PB_8}, wh_right{PB_9}; // Wheel switch associated pins
+/*Same*/ PinName mc_din{PB_10}; // Manual charging detection associated pins
 /*Th pins changed*/ PinName ac_th_pos{PA_0}, ac_th_neg{PA_1}, ac_IrDA_tx{PA_2}, ac_IrDA_rx{PA_3}, ac_analogVol{PB_1}, ac_chargingRelay{PB_2}; // Auto charging detection associated pins
 /*Changed (not PB_11)*/ PinName bmu_main_sw{PB_11}, bmu_c_fet{PB_13}, bmu_d_fet{PB_14}, bmu_p_dsg{PB_15}; // BMU controller associated pins
 /*Same*/ PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors associated I2C pins
@@ -69,7 +69,6 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 /*Same*/ PinName fan_pwm{PA_8}; // PWM fan signal control pin
 /*Same*/ PinName sc_bat_out{PB_5}, sc_hb_led{PA_9}; // State controller associated pins
 PinName main_MCU_ON{PA_5}; // Pin controlling the MainMCU power-up
-  
 
 EventQueue globalqueue;
 
@@ -268,7 +267,7 @@ public:
 #endif
     }
 private:
-    DigitalIn left{bp_left}; 
+    DigitalIn left{bp_left};
     Timeout timeout;
     bool asserted{false};
 };
@@ -292,7 +291,7 @@ public:
             right_prev = now;
             right_count = 0;
         } else {
-            ++right_count;  
+            ++right_count;
         }
         if (right_count > COUNT) {
             right_count = COUNT;
@@ -406,7 +405,7 @@ public:
     bool is_temperature_error() const {return temperature_error;}
     void poll() {
         uint32_t prev_connect_check_count{connect_check_count};
-        connector_v = connector.read_voltage();  // Read the voltage from the auto charging terminals 
+        connector_v = connector.read_voltage();  // Read the voltage from the auto charging terminals
         if (connector_v > CONNECT_THRES_VOLTAGE) {
             if (++connect_check_count >= CONNECT_THRES_COUNT) {
                 connect_check_count = CONNECT_THRES_COUNT;
@@ -555,7 +554,7 @@ private: // Thermistor side starts here.
     bool adc_measure_mode{false}, temperature_error{false};
     static constexpr int ADDR{0b10010010}; // I2C adress for temp sensor
     static constexpr uint32_t CONNECT_THRES_COUNT{100}; // Number of times that ...
-    static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)}, 
+    static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
                            CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)}; //
 };
 
@@ -572,7 +571,6 @@ public:
                 (data.mod_status2 & 0b11100001) == 0 ||
                 (data.bmu_alarm1  & 0b11111111) == 0 ||
                 (data.bmu_alarm2  & 0b00000001) == 0);
-                
         //return true;
     }
     void get_fet_state(bool &c_fet, bool &d_fet, bool &p_dsg) {
@@ -613,7 +611,7 @@ private:
     }
     can_driver &can;
     DigitalOut main_sw{bmu_main_sw, 0}; // MAIN_SW switch pin
-    DigitalIn c_fet{bmu_c_fet}, d_fet{bmu_d_fet}, p_dsg{bmu_p_dsg}; 
+    DigitalIn c_fet{bmu_c_fet}, d_fet{bmu_d_fet}, p_dsg{bmu_p_dsg};
         struct {
         int16_t pack_a{0};
         uint16_t pack_v{0};
@@ -627,7 +625,7 @@ public:
     void init() {
         uint8_t buf[2];
         buf[0] = 0x0b; // ID Register
-        I2C i2c{ts_i2c_sda, ts_i2c_scl}; 
+        I2C i2c{ts_i2c_sda, ts_i2c_scl};
         i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 1) == 0 &&
@@ -652,7 +650,7 @@ public:
     void poll() {
         uint8_t buf[2];
         buf[0] = 0x00; // Temperature Value MSB Register
-        I2C i2c{ts_i2c_sda, ts_i2c_scl};  
+        I2C i2c{ts_i2c_sda, ts_i2c_scl};
         i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
@@ -668,11 +666,11 @@ private:
 
 class dcdc_converter { // Variables Implemented
 public:
-    void set_enable(bool enable) { 
+    void set_enable(bool enable) {
         if (enable) {               // In this configuration 0=OFF, 1=ON
             control[0].write(1);    // external 5V must be turned on first.
             control[1].write(1);
-            //control[2].write(1);    // control[2] controls the relay of the MAIN_SW of the BMU. 
+            //control[2].write(1);    // control[2] controls the relay of the MAIN_SW of the BMU.
             control[2].write(1);    // control[3] controls the relay that powers ON the main MCU
         } else {
             control[1].write(0);    // 16V must be turned off first.
@@ -682,7 +680,7 @@ public:
         }
     }
     bool is_ok() {
-        return fail[0].read() != 0 && fail[1].read() != 0;    
+        return fail[0].read() != 0 && fail[1].read() != 0;
         //return true;
     }
     void get_failed_state(bool &v5, bool &v16) {
@@ -690,8 +688,8 @@ public:
         v16 = fail[1].read() == 0;
     }
 private:
-    DigitalOut control[3]{{dcdc_control_5v, 0}, {dcdc_control_16v, 0}, {main_MCU_ON, 0}}; 
-    DigitalIn fail[2]{dcdc_failSignal_5v, dcdc_failSignal_16v}; 
+    DigitalOut control[3]{{dcdc_control_5v, 0}, {dcdc_control_16v, 0}, {main_MCU_ON, 0}};
+    DigitalIn fail[2]{dcdc_failSignal_5v, dcdc_failSignal_16v};
 };
 
 class fan_driver { // Variables Implemented
@@ -723,7 +721,7 @@ public:
         return pwm.read_pulsewitdth_us() * CONTROL_HZ * 100 / 1000000;
     }
 private:
-    PwmOut pwm{fan_pwm}; 
+    PwmOut pwm{fan_pwm};
     static constexpr int CONTROL_HZ{5000};
 };
 
