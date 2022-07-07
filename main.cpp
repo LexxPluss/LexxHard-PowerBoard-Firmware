@@ -37,25 +37,6 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 #define LOG(...) logger.print(__VA_ARGS__)
 #endif
 
-// Declaring the name and function of the STM32F103 GPIO.
-// Old pinOut declaration
-
-/*Confirmed*/ //PinName can_tx{PA_11}, can_rx{PA_12}; // Can associated pins
-/*Confirmed*/ //PinName ps_sw_in{PB_0}, ps_led_out{PB_13}; // Power Switch handler associated pins
-/*Confirmed, only one used*/ //PinName bp_left{PA_4}, bp_right{PA_5}; // Bumper Switch associated pins
-/*Confirmed*/ //PinName es_left{PA_6}, es_right{PA_7}; // Emergency Switch associated pins
-/*Confirmed*/ //PinName wh_left{PB_8}, wh_right{PB_9}; // Wheel switch associated pins
-/*Confirmed*/ //PinName mc_din{PB_10}; // Manual charging detection associated pins
-/*Confirmed*/ //PinName /*{ac_th_pos{PB_7}, ac_th_neg{PB_6},} Change for ADC pins*/ ac_IrDA_tx{PA_2}, ac_IrDA_rx{PA_3}, ac_analogVol{PB_1}, ac_chargingRelay{PB_2}; // Auto charging detection associated pins
-/*Confirmed*/ //PinName bmu_main_sw{PB_11}, bmu_c_fet{PB_14}, bmu_d_fet{PB_15}, bmu_p_dsg{PA_9}; // BMU controller associated pins
-/*Confirmed*/ //PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors x3 associated to the same I2C pins
-/*Confirmed*/ //PinName dcdc_control_16v{PA_10}, dcdc_control_5v{PB_3}, /*{dcdc_control_33v{PA_1}}, not used as well as PA_0*/, dcdc_failSignal_16v{PA_15}, dcdc_failSignal_5v{PB_4}; // DC-DC related control and fail signal pins
-/*Confirmed*/ //PinName fan_pwm{PA_8}; // PWM fan signal control pin
-/*Confirmed*/ //PinName sc_bat_out{PB_5}, sc_hb_led{PB_12}; /*{sc_hb_led{PB_12}}, not implemented in the circuit, but required*/ // State controller associated pins
-
-
-// Declaring NEW pinOut for STM32F103 GPIO.
-
 /*Switched*/ PinName can_tx{PA_12}, can_rx{PA_11}; // Can associated pins
 /*Half-Changed*/ PinName ps_sw_in{PB_0}, ps_led_out{PB_12}; // Power Switch handler associated pins
 /*Changed*/ PinName bp_left{PA_4}; // Bumper Switch associated pins
@@ -449,26 +430,6 @@ private: // Thermistor side starts here.
         }
     }
     void adc_read() { // Change to read the temperature sensor from ADC pin directly. Thermistor side.
-        /*
-        uint8_t buf[2];
-        buf[0] = 0b00000000; // Conversion Register
-        I2C i2c{PB_7, PB_6}; // Search pins
-        i2c.frequency(400000);
-        if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1) == 0 &&
-            i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
-            int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
-            float voltage{static_cast<float>(value) / 32768.0f * 4.096f};
-
-            temperature_error_count = 0;
-            temperature_error = false;
-        } else {
-            if (++temperature_error_count > 10) {
-                temperature_error_count = 10;
-                temperature_error = true;
-            }
-        }
-        */
-
         float v_th_pos{therm_pos.read_voltage()}; // Read the positive thermistor voltage
         float v_th_neg{therm_neg.read_voltage()}; // Read the negative thermistor voltage
 
@@ -492,25 +453,6 @@ private: // Thermistor side starts here.
         i2c.frequency(400000);
         i2c.write(ADDR, reinterpret_cast<const char*>(buf), sizeof buf);
     }
-
-    /*
-    void calculate_temperature(float adc_voltage) { // Do not touch
-        if (adc_voltage > 3.29999f) //adc_voltage (float)
-            adc_voltage = 3.29999f;
-        if (adc_voltage < 0.0f)
-            adc_voltage = 0.0f;
-        // see https://lexxpluss.esa.io/posts/459
-        static constexpr float R0{3300.0f}, B{3970.0f}, T0{373.0f};
-        float Rpu{adc_ch < 2 ? 27000.0f : 10000.0f};
-        float R{Rpu * adc_voltage / (3.3f - adc_voltage)};
-        float T{1.0f / (logf(R / R0) / B + 1.0f / T0)};
-        static constexpr float gain{0.02f}; // Low pass filter gain
-        if (adc_ch == 0 || adc_ch == 2)
-            connector_temp[0] = connector_temp[0] * (1.0f - gain) + (T - 273.0f) * gain; // Low pass filter function
-        else
-            connector_temp[1] = connector_temp[1] * (1.0f - gain) + (T - 273.0f) * gain;
-    }
-    */
     void calculate_temperature(float adc_voltage, uint8_t sensor) { // Changed version for direct ADC measurements
         adc_voltage = clamp(adc_voltage, 0.0f, 3.29999f); // Clamp the value of the adc voltage received
         // see https://lexxpluss.esa.io/posts/459
@@ -555,7 +497,7 @@ private: // Thermistor side starts here.
     static constexpr int ADDR{0b10010010}; // I2C adress for temp sensor
     static constexpr uint32_t CONNECT_THRES_COUNT{100}; // Number of times that ...
     static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
-                           CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)}; //
+                           CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)};
 };
 
 class bmu_controller { // Variables Implemented
@@ -571,7 +513,6 @@ public:
                 (data.mod_status2 & 0b11100001) == 0 ||
                 (data.bmu_alarm1  & 0b11111111) == 0 ||
                 (data.bmu_alarm2  & 0b00000001) == 0);
-        //return true;
     }
     void get_fet_state(bool &c_fet, bool &d_fet, bool &p_dsg) {
         c_fet = this->c_fet.read() == 1;
@@ -637,7 +578,6 @@ public:
     }
     bool is_ok() const {
         return temperature < 80.0f;
-        //return true;
     }
     int get_temperature() const {
         if (temperature > 127.0f)
@@ -681,7 +621,6 @@ public:
     }
     bool is_ok() {
         return fail[0].read() != 0 && fail[1].read() != 0;
-        //return true;
     }
     void get_failed_state(bool &v5, bool &v16) {
         v5 = fail[0].read() == 0;
