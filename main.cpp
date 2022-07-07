@@ -59,7 +59,7 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 /*Switched*/ PinName can_tx{PA_12}, can_rx{PA_11}; // Can associated pins
 /*Half-Changed*/ PinName ps_sw_in{PB_0}, ps_led_out{PB_12}; // Power Switch handler associated pins
 /*Changed*/ PinName bp_left{PA_4}; // Bumper Switch associated pins 
-/*Same*/ PinName es_left{PA_6}, es_right{PA_7}; // Emergency Switch associated pins
+/*Same*/ PinName es_left{PA_6}, es_right(PA_7); // Emergency Switch associated pins
 /*Same*/ PinName wh_left{PB_8}, wh_right{PB_9}; // Wheel switch associated pins 
 /*Same*/ PinName mc_din{PB_10}; // Manual charging detection associated pins 
 /*Th pins changed*/ PinName ac_th_pos{PA_0}, ac_th_neg{PA_1}, ac_IrDA_tx{PA_2}, ac_IrDA_rx{PA_3}, ac_analogVol{PB_1}, ac_chargingRelay{PB_2}; // Auto charging detection associated pins
@@ -67,7 +67,7 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 /*Same*/ PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors associated I2C pins
 /*Switched*/ PinName dcdc_control_16v{PB_3}, dcdc_control_5v{PA_10}, dcdc_failSignal_16v{PB_4}, dcdc_failSignal_5v{PA_15}; // DC-DC related control and fail signal pins
 /*Same*/ PinName fan_pwm{PA_8}; // PWM fan signal control pin
-/*Same*/ PinName sc_bat_out{PB_5}, sc_hb_led{PA_9} // State controller associated pins
+/*Same*/ PinName sc_bat_out{PB_5}, sc_hb_led{PA_9}; // State controller associated pins
 PinName main_MCU_ON{PA_5}; // Pin controlling the MainMCU power-up
   
 
@@ -252,7 +252,7 @@ private:
 class bumper_switch { // Variables Implemented
 public:
     void poll() {
-        if (left.read() == 0 || right.read() == 0) {
+        if (left.read() == 0) {
             asserted = true;
             timeout.attach([this](){asserted = false;}, 1s);
         }
@@ -292,7 +292,7 @@ public:
             right_prev = now;
             right_count = 0;
         } else {
-            ++right_count;
+            ++right_count;  
         }
         if (right_count > COUNT) {
             right_count = COUNT;
@@ -305,7 +305,7 @@ public:
         right = right_asserted;
     }
 private:
-    DigitalIn left{es_left}, right{es_right}; 
+    DigitalIn left{es_left}, right{es_right};
     uint32_t left_count{0}, right_count{0};
     int left_prev{-1}, right_prev{-1};
     bool left_asserted{false}, right_asserted{false};
@@ -470,8 +470,8 @@ private: // Thermistor side starts here.
         }
         */
 
-        float v_th_pos{therm_pos.read_voltage() / 32768.0f * 4.096f} // Read the positive thermistor voltage
-        float v_th_neg{therm_pos.read_voltage() / 32768.0f * 4.096f} // Read the negative thermistor voltage
+        float v_th_pos{therm_pos.read_voltage()}; // Read the positive thermistor voltage
+        float v_th_neg{therm_neg.read_voltage()}; // Read the negative thermistor voltage
 
         calculate_temperature(v_th_pos, 0); // Calculate the thermistor PLUS temperature
         calculate_temperature(v_th_neg, 1); // Calculate the thermistor MINUS temperature
@@ -572,6 +572,8 @@ public:
                 (data.mod_status2 & 0b11100001) == 0 ||
                 (data.bmu_alarm1  & 0b11111111) == 0 ||
                 (data.bmu_alarm2  & 0b00000001) == 0);
+                
+        //return true;
     }
     void get_fet_state(bool &c_fet, bool &d_fet, bool &p_dsg) {
         c_fet = this->c_fet.read() == 1;
@@ -610,7 +612,7 @@ private:
         }
     }
     can_driver &can;
-    DigitalOut main_sw{bmu_main_sw, 0}; // Main switch pin
+    DigitalOut main_sw{bmu_main_sw, 0}; // MAIN_SW switch pin
     DigitalIn c_fet{bmu_c_fet}, d_fet{bmu_d_fet}, p_dsg{bmu_p_dsg}; 
         struct {
         int16_t pack_a{0};
@@ -636,8 +638,8 @@ public:
         }
     }
     bool is_ok() const {
-        //return temperature < 80.0f;
-        return true;
+        return temperature < 80.0f;
+        //return true;
     }
     int get_temperature() const {
         if (temperature > 127.0f)
@@ -669,16 +671,19 @@ public:
     void set_enable(bool enable) { 
         if (enable) {               // In this configuration 0=OFF, 1=ON
             control[0].write(1);    // external 5V must be turned on first.
-            control[1].write(1); 
-            control[2].write(1);    // control[2] controls the relay that powers ON the main MCU
+            control[1].write(1);
+            //control[2].write(1);    // control[2] controls the relay of the MAIN_SW of the BMU. 
+            control[2].write(1);    // control[3] controls the relay that powers ON the main MCU
         } else {
             control[1].write(0);    // 16V must be turned off first.
             control[0].write(0);
+            // control[2].write(0);
             control[2].write(0);
         }
     }
     bool is_ok() {
-        return /*fail[0].read() != 0 &&*/ fail[1].read() != 0;
+        return fail[0].read() != 0 && fail[1].read() != 0;    
+        //return true;
     }
     void get_failed_state(bool &v5, bool &v16) {
         v5 = fail[0].read() == 0;
