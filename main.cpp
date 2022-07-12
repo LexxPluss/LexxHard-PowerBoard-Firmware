@@ -748,6 +748,7 @@ private:
         AUTO_CHARGE,
         MANUAL_CHARGE,
         LOCKDOWN,
+        TIMEROFF,
     };
     void poll() {
         auto wheel_relay_control = [&](){
@@ -769,6 +770,10 @@ private:
         switch (state) {
         case POWER_STATE::OFF:
             set_new_state(mc.is_plugged() ? POWER_STATE::POST : POWER_STATE::WAIT_SW);
+            break;
+        case POWER_STATE::TIMEROFF:
+            if (timer_poweroff.elapsed_time() > 5s)
+                set_new_state(POWER_STATE::OFF);
             break;
         case POWER_STATE::WAIT_SW:
             if (psw.get_state() != power_switch::STATE::RELEASED) {
@@ -796,7 +801,7 @@ private:
             if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED) {
                 set_new_state(POWER_STATE::OFF);
             } else if (mbd.is_dead()) {
-                set_new_state(wait_shutdown ? POWER_STATE::OFF : POWER_STATE::LOCKDOWN);
+                set_new_state(wait_shutdown ? POWER_STATE::TIMEROFF : POWER_STATE::LOCKDOWN);
             } else if (psw_state == power_switch::STATE::PUSHED || mbd.power_off_from_ros() ||
                 mbd.is_overheat() || !bmu.is_ok() || !temp.is_ok()) {
                 if (wait_shutdown) {
@@ -956,6 +961,11 @@ private:
             while (true) // wait power off
                 continue;
             break;
+        case POWER_STATE::TIMEROFF:
+            LOG("enter TIMEROFF\n");
+            timer_poweroff.reset();
+            timer_poweroff.start();
+            break;
         case POWER_STATE::WAIT_SW:
             LOG("enter WAIT_SW\n");
             break;
@@ -1104,7 +1114,7 @@ private:
         POWERBOARD_TEMP,
         BMU,
     } shutdown_reason{SHUTDOWN_REASON::NONE};
-    Timer timer_post, timer_shutdown;
+    Timer timer_post, timer_shutdown, timer_poweroff;
     Timeout current_check_timeout, charge_guard_timeout;
     bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false}, charge_guard_asserted{false},
          last_wheel_poweroff{false};
