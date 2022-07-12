@@ -413,45 +413,17 @@ public:
             }
         }
 #endif
-        adc_ticktock();
+        adc_read();
     }
     void update_rsoc(uint8_t rsoc) {
         this->rsoc = rsoc;
     }
 private: // Thermistor side starts here.
-    void adc_ticktock() { // Not used
-        if (adc_measure_mode) {
-            adc_read();
-            adc_ch = adc_ch == 2 ? 3 : 2;
-            adc_measure_mode = false;
-        } else {
-            adc_measure();
-            adc_measure_mode = true;
-        }
-    }
     void adc_read() { // Change to read the temperature sensor from ADC pin directly. Thermistor side.
         float v_th_pos{therm_pos.read_voltage()}; // Read the positive thermistor voltage
         float v_th_neg{therm_neg.read_voltage()}; // Read the negative thermistor voltage
-
         calculate_temperature(v_th_pos, 0); // Calculate the thermistor PLUS temperature
         calculate_temperature(v_th_neg, 1); // Calculate the thermistor MINUS temperature
-
-    }
-    void adc_measure() const { // Not used
-        uint8_t buf[3];
-        buf[0] = 0b00000001; // Config Register
-        buf[1] = 0b10000011; // Start, FSR4.096V, Single
-        buf[2] = 0b10000011; // 128SPS
-        switch (adc_ch) {
-        default:
-        case 0: buf[1] |= 0b01000000; break;
-        case 1: buf[1] |= 0b01010000; break;
-        case 2: buf[1] |= 0b01100000; break;
-        case 3: buf[1] |= 0b01110000; break;
-        }
-        I2C i2c{PB_7, PB_6}; // Search pins
-        i2c.frequency(400000);
-        i2c.write(ADDR, reinterpret_cast<const char*>(buf), sizeof buf);
     }
     void calculate_temperature(float adc_voltage, uint8_t sensor) { // Changed version for direct ADC measurements
         adc_voltage = clamp(adc_voltage, 0.0f, 3.29999f); // Clamp the value of the adc voltage received
@@ -492,8 +464,7 @@ private: // Thermistor side starts here.
     uint8_t heartbeat_counter{0}, rsoc{0};
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
     uint32_t connect_check_count{0}, temperature_error_count{0};
-    int adc_ch{2};
-    bool adc_measure_mode{false}, temperature_error{false};
+    bool temperature_error{false};
     static constexpr int ADDR{0b10010010}; // I2C adress for temp sensor
     static constexpr uint32_t CONNECT_THRES_COUNT{100}; // Number of times that ...
     static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
