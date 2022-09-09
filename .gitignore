@@ -22,5 +22,6 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 .mbedbuild
+/.idea/
 cmake_build/
 /mbed-os/
