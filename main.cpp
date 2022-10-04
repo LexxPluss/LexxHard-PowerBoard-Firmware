@@ -173,7 +173,7 @@ public:
                 timer.start();
             } else if (now == 0) {
                 auto elapsed{timer.elapsed_time()};
-                if (elapsed > 10s) {
+                if (elapsed > 60s) {
                     if (state != STATE::LONG_PUSHED)
                         state = STATE::LONG_PUSHED;
                 } else if (elapsed > 3s) {
