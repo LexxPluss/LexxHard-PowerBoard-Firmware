@@ -1061,7 +1061,7 @@ private:
         watchdog.kick();
     }
     void poll_10s() {
-        uint8_t buf[8]{'2', '0', '2'}; // version
+        uint8_t buf[8]{'2', '0', '3'}; // version
         can.send(CANMessage{0x203, buf});
     }
     can_driver can;
