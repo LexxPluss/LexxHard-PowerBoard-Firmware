@@ -386,6 +386,7 @@ public:
     bool is_temperature_error() const {return temperature_error;}
     void poll() {
         uint32_t prev_connect_check_count{connect_check_count};
+        AnalogIn connector{ac_analogVol, 3.3f}; // Charging connector pin 0 - 24V. (3.3f max voltage reference - map voltage between 0 - 3.3V)
         connector_v = connector.read_voltage();  // Read the voltage from the auto charging terminals
         if (connector_v > CONNECT_THRES_VOLTAGE) {
             if (++connect_check_count >= CONNECT_THRES_COUNT) {
@@ -420,6 +421,8 @@ public:
     }
 private: // Thermistor side starts here.
     void adc_read() { // Change to read the temperature sensor from ADC pin directly. Thermistor side.
+        AnalogIn therm_pos{ac_th_pos, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
+        AnalogIn therm_neg{ac_th_neg, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
         float v_th_pos{therm_pos.read_voltage()}; // Read the positive thermistor voltage
         float v_th_neg{therm_neg.read_voltage()}; // Read the negative thermistor voltage
         calculate_temperature(v_th_pos, 0); // Calculate the thermistor PLUS temperature
@@ -455,9 +458,6 @@ private: // Thermistor side starts here.
 #ifndef SERIAL_DEBUG
     BufferedSerial serial{ac_IrDA_tx, ac_IrDA_rx}; // IrDA serial pins
 #endif
-    AnalogIn connector{ac_analogVol, 3.3f}; // Charging connector pin 0 - 24V. (3.3f max voltage reference - map voltage between 0 - 3.3V)
-    AnalogIn therm_pos{ac_th_pos, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
-    AnalogIn therm_neg{ac_th_neg, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
     DigitalOut sw{ac_chargingRelay, 0}; // declare the robot auto Charging relay pin!!
     Timer heartbeat_timer, serial_timer;
     serial_message msg;
