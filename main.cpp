@@ -466,7 +466,6 @@ private: // Thermistor side starts here.
         connector_temp[sensor] = connector_temp[sensor] * (1.0f - gain) + (T - 273.0f) * gain; // Low pass filter function
     }
     bool is_connected() const {
-        LOG("is_connected() connect_check_count:%d CONNECT_THRES_COUNT:%d\n", connect_check_count, CONNECT_THRES_COUNT);
         return connect_check_count >= CONNECT_THRES_COUNT;
     }
     bool is_overheat() const {
@@ -872,13 +871,14 @@ private:
             } else if (!charge_guard_asserted && ac.is_docked() && bmu.is_chargable()) {
                 LOG("docked to auto charger\n");
                 set_new_state(POWER_STATE::AUTO_CHARGE);
-            }else if(charge_guard_asserted){
-                LOG("charge_guard_asserted\n");
-            }else if(!ac.is_docked()){
-                LOG("!ac.is_docked()\n");
-            }else if(!bmu.is_chargable()){
-                LOG("!bmu.is_chargable())\n");
             }
+            // else if(charge_guard_asserted){
+            //     LOG("charge_guard_asserted\n");
+            // }else if(!ac.is_docked()){
+            //     LOG("!ac.is_docked()\n");
+            // }else if(!bmu.is_chargable()){
+            //     LOG("!bmu.is_chargable())\n");
+            // }
             break;
         case POWER_STATE::AUTO_CHARGE:
             ac.update_rsoc(bmu.get_rsoc());
