@@ -362,6 +362,7 @@ public:
     }
     bool is_docked() const {
         return is_connected() && !temperature_error && !is_overheat() && heartbeat_timer.elapsed_time() < 5s;
+        // return is_charger_ready() && is_connected() && !temperature_error && !is_overheat() && heartbeat_timer.elapsed_time() < 5s;
     }
     void set_enable(bool enable) {
         sw.write(enable ? 1 : 0);
@@ -369,6 +370,15 @@ public:
     void force_stop() {
         set_enable(false);
         send_heartbeat();
+    }
+    bool is_charger_ready() const {
+        if(connector_v > (CHARGING_VOLTAGE * 0.9)){
+            LOG("charger ready voltage:%f.\n", connector_v);
+            return true;
+        }else {
+            LOG("connector_v:%f THRESH:%f\n", connector_v, (CHARGING_VOLTAGE * 0.9));
+            return false;
+        }
     }
     void get_connector_temperature(int &positive, int &negative) const {
         positive = clamp(static_cast<int>(connector_temp[0]), 0, 255);
@@ -446,7 +456,16 @@ private: // Thermistor side starts here.
             send_heartbeat();
     }
     void send_heartbeat() {                                                    /* Creates the message to send to the robot using the "compose" function below */
-        uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read()), rsoc}; // Message composed of 8 bytes, 3 bytes parameters -- Declaration
+        // uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read()), rsoc}; // Message composed of 8 bytes, 3 bytes parameters -- Declaration
+        uint8_t sw_state{0};
+
+        if(is_connected()){
+            sw_state = 1;
+        }else{
+            sw_state = 0;
+        }
+         
+        uint8_t buf[8], param[3]{++heartbeat_counter, sw_state, rsoc}; // Message composed of 8 bytes, 3 bytes parameters -- Declaration
         serial_message::compose(buf, serial_message::HEARTBEAT, param);
 #ifndef SERIAL_DEBUG
         serial.write(buf, sizeof buf);
@@ -838,8 +857,12 @@ private:
                 LOG("plugged to manual charger\n");
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
             } else if (!charge_guard_asserted && ac.is_docked() && bmu.is_chargable()) {
-                LOG("docked to auto charger\n");
-                set_new_state(POWER_STATE::AUTO_CHARGE);
+                if(ac.is_charger_ready() == true){
+                    LOG("docked to auto charger\n");
+                    set_new_state(POWER_STATE::AUTO_CHARGE);
+                }
+                // LOG("docked to auto charger\n");
+                // set_new_state(POWER_STATE::AUTO_CHARGE);
             }
             break;
         case POWER_STATE::AUTO_CHARGE:
