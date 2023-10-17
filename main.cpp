@@ -542,17 +542,17 @@ public:
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 1) == 0 &&
             (buf[0] & 0b11111000) == 0b11001000) {
-            isInstalled = true; //As ID was read successfully we assume that is installed
+            successfullyDetected = true; // As ID was read successfully we assume that is installed
             buf[0] = 0x03; // Configuration Register
             buf[1] = 0b10000000; // 16bit
             i2c.write(ADDR, reinterpret_cast<const char*>(buf), 2);
         }
     }
     bool is_ok() const {
-        if(isInstalled)
-          return temperature < 80.0f;
+        if (successfullyDetected)
+            return temperature < 80.0f;
         else
-          return false; //Avoid returning true if sensor is not installed
+            return false; // Avoid returning true if sensor is not detected
     }
     int get_temperature() const {
         if (temperature > 127.0f)
@@ -576,7 +576,7 @@ public:
     }
 private:
     float temperature{0.0f};
-    bool isInstalled;
+    bool successfullyDetected{false}; // Default false until sensor was detected
     static constexpr int ADDR{0b10010000};
 };
 
