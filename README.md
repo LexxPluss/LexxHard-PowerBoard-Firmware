@@ -1,7 +1,7 @@
 # LexxPluss Power Board Software
 
-[![CI](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/main.yml/badge.svg)](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/main.yml)
-[![release](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/release.yml/badge.svg)](https://github.com/LexxPluss/mbed-os-powerboard/actions/workflows/release.yml)
+[![CI](https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware/actions/workflows/main.yml/badge.svg)](https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware/actions/workflows/main.yml)
+[![release](https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware/actions/workflows/release.yml/badge.svg)](https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware/actions/workflows/release.yml)
 
 ## Install Mbed CLI 2 (mbed-tools).
 https://os.mbed.com/docs/mbed-os/v6.15/build-tools/install-or-upgrade.html
@@ -12,27 +12,10 @@ https://developer.arm.com/tools-and-software/open-source-software/developer-tool
 ## Build
 
 ```bash
-$ git clone https://github.com/LexxPluss/mbed-os-powerboard.git
-$ cd mbed-os-powerboard
+$ git clone https://github.com/LexxPluss/LexxHard-PowerBoard-Firmware.git
+$ cd LexxHard-PowerBoard-Firmware
 $ mbed-tools deploy
 $ mbed-tools compile -m LEXXPLUSS_PB01 -t GCC_ARM
-```
-
-> macOSでプラットフォーム以外のpython (pyenvとか) を使っている場合、cmakeがプラットフォームのpythonを使おうとして正常にビルドできない場合がある。
-> その場合はmbed-osに下記パッチを適用すると正常にビルドできるようになる。
-
-```diff
-diff --git a/tools/cmake/app.cmake b/tools/cmake/app.cmake
-index 9f62df8204..edc4d02fca 100644
---- a/tools/cmake/app.cmake
-+++ b/tools/cmake/app.cmake
-@@ -31,6 +31,7 @@ enable_language(C CXX ASM)
- set(CMAKE_EXECUTABLE_SUFFIX .elf)
- 
- # Find Python
-+set(CMAKE_FIND_FRAMEWORK NEVER)
- find_package(Python3 COMPONENTS Interpreter)
- include(CheckPythonPackage)
 ```
 
 ## Install STLINK Tools
@@ -43,19 +26,19 @@ $ brew install stlink
 
 ## Program
 
-バッテリー電源で書き込みを行う場合は、書き込み中に電源が切れないよう、電源スイッチを押したままの状態で書き込みを行う必要がある。
+When writing on battery power, the power switch must be held down to prevent power loss during writing.
 
 ### STLINK Tools (Open souce version)
 
 ```bash
-$ st-flash --connect-under-reset cmake_build/LEXXPLUSS_PB01/develop/GCC_ARM/mbed-os-powerboard.bin 0x8000000
+$ st-flash --connect-under-reset cmake_build/LEXXPLUSS_PB01/develop/GCC_ARM/LexxHard-PowerBoard-Firmware.bin 0x8000000
 ```
 
 ### STM32CubeProgrammer
 
-右側ST-LINKを選択して、PortはSWD、Reset modeはHardwaree reset、Connectで接続。
-左側はErasing & Programming画面を表示する。
-File pathで書き込みファイルを選ぶ、Start addressは0x08000000、Start Programmingで書き込み開始。
+On the right side, select ST-LINK, Port is SWD, Reset mode is Hardware reset, and Connect to connect.
+The Erasing & Programming screen is displayed on the left side.
+Select a file to write with File path, Start address is 0x08000000, and Start Programming to start writing.
 
 ![cubeprogrammer](docs/cubeprogrammer.png)
 
@@ -123,3 +106,7 @@ Power Board Log Message (Published from Power Board)
 | byte offset | info | detail |
 |---|---|---|
 | 0-7 | message | NULL terminate string |
+
+## License
+
+Copyright (c) 2022, LexxPluss Inc. Released under the [BSD License](LICENSE).

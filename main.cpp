@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2022, LexxPluss Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include "mbed.h"
 #include "serial_message.hpp"
 
@@ -12,6 +37,20 @@ FILE *debugout{fdopen(&debugserial, "r+")};
 #define LOG(...) logger.print(__VA_ARGS__)
 #endif
 
+/*Switched*/ PinName can_tx{PA_12}, can_rx{PA_11}; // Can associated pins
+/*Half-Changed*/ PinName ps_sw_in{PB_0}, ps_led_out{PB_12}; // Power Switch handler associated pins
+/*Changed*/ PinName bp_left{PA_4}; // Bumper Switch associated pins
+/*Same*/ PinName es_left{PA_6}, es_right(PA_7); // Emergency Switch associated pins
+/*Same*/ PinName wh_left{PB_8}, wh_right{PB_9}; // Wheel switch associated pins
+/*Same*/ PinName mc_din{PB_10}; // Manual charging detection associated pins
+/*Th pins changed*/ PinName ac_th_pos{PA_0}, ac_th_neg{PA_1}, ac_IrDA_tx{PA_2}, ac_IrDA_rx{PA_3}, ac_analogVol{PB_1}, ac_chargingRelay{PB_2}; // Auto charging detection associated pins
+/*Changed (not PB_11)*/ PinName bmu_main_sw{PB_11}, bmu_c_fet{PB_13}, bmu_d_fet{PB_14}, bmu_p_dsg{PB_15}; // BMU controller associated pins
+/*Same*/ PinName ts_i2c_scl{PB_6}, ts_i2c_sda{PB_7}; // Temperature sensors associated I2C pins
+/*Switched*/ PinName dcdc_control_16v{PB_3}, dcdc_control_5v{PA_10}, dcdc_failSignal_16v{PB_4}, dcdc_failSignal_5v{PA_15}; // DC-DC related control and fail signal pins
+/*Same*/ PinName fan_pwm{PA_8}; // PWM fan signal control pin
+/*Same*/ PinName sc_bat_out{PB_5}, sc_hb_led{PA_9}; // State controller associated pins
+PinName main_MCU_ON{PA_5}; // Pin controlling the MainMCU power-up
+
 EventQueue globalqueue;
 
 template<typename T>
@@ -20,7 +59,7 @@ inline const T &clamp(const T &val, const T &min, const T &max)
     return val < min ? min : (val > max ? max : val);
 }
 
-class can_callback {
+class can_callback { // No pins declared
 public:
     void register_callback(uint32_t msgid, Callback<void(const CANMessage &msg)> func) {
         if (count < NUM) {
@@ -47,7 +86,7 @@ private:
     } callbacks[NUM];
 };
 
-class can_driver {
+class can_driver { // Variables Implemented
 public:
     can_driver() {
         can.frequency(500000);
@@ -66,12 +105,12 @@ public:
         can.write(msg);
     }
 private:
-    CAN can{PA_11, PA_12};
+    CAN can{can_rx, can_tx};
     can_callback callback;
     int filter_handle{0};
 };
 
-class log_printer {
+class log_printer { // No pins declared
 public:
     void set_can_driver(can_driver *can) {
         this->can = can;
@@ -95,7 +134,7 @@ private:
     char buffer[128];
 } logger;
 
-class power_switch_handler {
+class power_switch_handler {  // No pins declared
 public:
     power_switch_handler(int thres) : thres(thres * 2) {
         timer.start();
@@ -120,7 +159,7 @@ private:
     bool activated{false};
 };
 
-class power_switch {
+class power_switch { // Variables Implemented
 public:
     enum class STATE {
         RELEASED, PUSHED, LONG_PUSHED,
@@ -143,13 +182,12 @@ public:
             sw_bat.poll(changed);
             sw_unlock.poll(changed);
             if (changed) {
-                LOG("power_switch change to %d\n", now);
                 prev = now;
                 timer.reset();
                 timer.start();
             } else if (now == 0) {
                 auto elapsed{timer.elapsed_time()};
-                if (elapsed > 10s) {
+                if (elapsed > 60s) {
                     if (state != STATE::LONG_PUSHED)
                         state = STATE::LONG_PUSHED;
                 } else if (elapsed > 3s) {
@@ -182,8 +220,8 @@ public:
     }
 private:
     power_switch_handler sw_bat{2}, sw_unlock{10};
-    DigitalIn sw{PB_0};
-    DigitalOut led{PB_13, 0};
+    DigitalIn sw{ps_sw_in};
+    DigitalOut led{ps_led_out, 0};
     Timer timer;
     STATE state{STATE::RELEASED};
     uint32_t count{0};
@@ -191,10 +229,10 @@ private:
     static constexpr uint32_t COUNT{1};
 };
 
-class bumper_switch {
+class bumper_switch { // Variables Implemented
 public:
     void poll() {
-        if (left.read() == 0 || right.read() == 0) {
+        if (left.read() == 0) {
             asserted = true;
             timeout.attach([this](){asserted = false;}, 1s);
         }
@@ -210,12 +248,12 @@ public:
 #endif
     }
 private:
-    DigitalIn left{PA_4}, right{PA_5};
+    DigitalIn left{bp_left};
     Timeout timeout;
     bool asserted{false};
 };
 
-class emergency_switch {
+class emergency_switch { // Variables Implemented
 public:
     void poll() {
         int now{left.read()};
@@ -247,14 +285,14 @@ public:
         right = right_asserted;
     }
 private:
-    DigitalIn left{PA_6}, right{PA_7};
+    DigitalIn left{es_left}, right{es_right};
     uint32_t left_count{0}, right_count{0};
     int left_prev{-1}, right_prev{-1};
     bool left_asserted{false}, right_asserted{false};
     static constexpr uint32_t COUNT{5};
 };
 
-class wheel_switch {
+class wheel_switch { // Variables Implemented
 public:
     void set_disable(bool disable) {
         if (disable) {
@@ -270,10 +308,10 @@ public:
         right = this->right.read() == 1;
     }
 private:
-    DigitalOut left{PB_8, 0}, right{PB_9, 0};
+    DigitalOut left{wh_left, 0}, right{wh_right, 0};
 };
 
-class manual_charger {
+class manual_charger { // Variables Implemented
 public:
     void init() {
         setup_first_state();
@@ -304,13 +342,13 @@ private:
         }
         plugged = plugped_count > 5;
     }
-    DigitalIn din{PB_10};
+    DigitalIn din{mc_din};
     Timer timer;
     int prev{1};
     bool plugged{false};
 };
 
-class auto_charger {
+class auto_charger { // Variables Half-Implemented (Not Thermistors ADC)
 public:
     void init() {
 #ifndef SERIAL_DEBUG
@@ -347,12 +385,18 @@ public:
     }
     bool is_temperature_error() const {return temperature_error;}
     void poll() {
-        connector_v = connector.read_voltage();
+        uint32_t prev_connect_check_count{connect_check_count};
+        connector_v = connector.read_voltage();  // Read the voltage from the auto charging terminals
         if (connector_v > CONNECT_THRES_VOLTAGE) {
-            if (++connect_check_count > CONNECT_THRES_COUNT)
+            if (++connect_check_count >= CONNECT_THRES_COUNT) {
                 connect_check_count = CONNECT_THRES_COUNT;
+                if (prev_connect_check_count < CONNECT_THRES_COUNT)
+                    LOG("connected to the charger.\n");
+            }
         } else {
             connect_check_count = 0;
+            if (prev_connect_check_count >= CONNECT_THRES_COUNT)
+                LOG("disconnected from the charger.\n");
         }
 #ifndef SERIAL_DEBUG
         while (serial.readable()) {
@@ -369,72 +413,27 @@ public:
             }
         }
 #endif
-        adc_ticktock();
+        adc_read();
     }
     void update_rsoc(uint8_t rsoc) {
         this->rsoc = rsoc;
     }
-private:
-    void adc_ticktock() {
-        if (adc_measure_mode) {
-            adc_read();
-            adc_ch = adc_ch == 2 ? 3 : 2;
-            adc_measure_mode = false;
-        } else {
-            adc_measure();
-            adc_measure_mode = true;
-        }
+private: // Thermistor side starts here.
+    void adc_read() { // Change to read the temperature sensor from ADC pin directly. Thermistor side.
+        float v_th_pos{therm_pos.read_voltage()}; // Read the positive thermistor voltage
+        float v_th_neg{therm_neg.read_voltage()}; // Read the negative thermistor voltage
+        calculate_temperature(v_th_pos, 0); // Calculate the thermistor PLUS temperature
+        calculate_temperature(v_th_neg, 1); // Calculate the thermistor MINUS temperature
     }
-    void adc_read() {
-        uint8_t buf[2];
-        buf[0] = 0b00000000; // Conversion Register
-        I2C i2c{PB_7, PB_6};
-        i2c.frequency(400000);
-        if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1) == 0 &&
-            i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
-            int16_t value{static_cast<int16_t>((buf[0] << 8) | buf[1])};
-            float voltage{static_cast<float>(value) / 32768.0f * 4.096f};
-            calculate_temperature(voltage);
-            temperature_error_count = 0;
-            temperature_error = false;
-        } else {
-            if (++temperature_error_count > 10) {
-                temperature_error_count = 10;
-                temperature_error = true;
-            }
-        }
-    }
-    void adc_measure() const {
-        uint8_t buf[3];
-        buf[0] = 0b00000001; // Config Register
-        buf[1] = 0b10000011; // Start, FSR4.096V, Single
-        buf[2] = 0b10000011; // 128SPS
-        switch (adc_ch) {
-        default:
-        case 0: buf[1] |= 0b01000000; break;
-        case 1: buf[1] |= 0b01010000; break;
-        case 2: buf[1] |= 0b01100000; break;
-        case 3: buf[1] |= 0b01110000; break;
-        }
-        I2C i2c{PB_7, PB_6};
-        i2c.frequency(400000);
-        i2c.write(ADDR, reinterpret_cast<const char*>(buf), sizeof buf);
-    }
-    void calculate_temperature(float adc_voltage) {
-        if (adc_voltage > 3.29999f)
-            adc_voltage = 3.29999f;
-        if (adc_voltage < 0.0f)
-            adc_voltage = 0.0f;
+    void calculate_temperature(float adc_voltage, uint8_t sensor) { // Changed version for direct ADC measurements
+        adc_voltage = clamp(adc_voltage, 0.0f, 3.29999f); // Clamp the value of the adc voltage received
         // see https://lexxpluss.esa.io/posts/459
         static constexpr float R0{3300.0f}, B{3970.0f}, T0{373.0f};
-        float Rpu{adc_ch < 2 ? 27000.0f : 10000.0f};
+        float Rpu{10000.0f};
         float R{Rpu * adc_voltage / (3.3f - adc_voltage)};
         float T{1.0f / (logf(R / R0) / B + 1.0f / T0)};
-        static constexpr float gain{0.02f};
-        if (adc_ch == 0 || adc_ch == 2)
-            connector_temp[0] = connector_temp[0] * (1.0f - gain) + (T - 273.0f) * gain;
-        else
-            connector_temp[1] = connector_temp[1] * (1.0f - gain) + (T - 273.0f) * gain;
+        static constexpr float gain{0.02f}; // Low pass filter gain
+        connector_temp[sensor] = connector_temp[sensor] * (1.0f - gain) + (T - 273.0f) * gain; // Low pass filter function
     }
     bool is_connected() const {
         return connect_check_count >= CONNECT_THRES_COUNT;
@@ -442,36 +441,37 @@ private:
     bool is_overheat() const {
         return connector_temp[0] > 80.0f || connector_temp[1] > 80.0f;
     }
-    void poll_1s() {
+    void poll_1s() {                                                         /* Function that checks the conditions of charging while the IrDA is connected */
         if (is_connected() && !temperature_error && !is_overheat())
             send_heartbeat();
     }
-    void send_heartbeat() {
-        uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read()), rsoc};
+    void send_heartbeat() {                                                    /* Creates the message to send to the robot using the "compose" function below */
+        uint8_t buf[8], param[3]{++heartbeat_counter, static_cast<uint8_t>(sw.read()), rsoc}; // Message composed of 8 bytes, 3 bytes parameters -- Declaration
         serial_message::compose(buf, serial_message::HEARTBEAT, param);
 #ifndef SERIAL_DEBUG
         serial.write(buf, sizeof buf);
 #endif
-    }
+    } // Declaration of variables
 #ifndef SERIAL_DEBUG
-    BufferedSerial serial{PA_2, PA_3};
+    BufferedSerial serial{ac_IrDA_tx, ac_IrDA_rx}; // IrDA serial pins
 #endif
-    AnalogIn connector{PB_1, 3.3f};
-    DigitalOut sw{PB_2, 0};
+    AnalogIn connector{ac_analogVol, 3.3f}; // Charging connector pin 0 - 24V. (3.3f max voltage reference - map voltage between 0 - 3.3V)
+    AnalogIn therm_pos{ac_th_pos, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
+    AnalogIn therm_neg{ac_th_neg, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
+    DigitalOut sw{ac_chargingRelay, 0}; // declare the robot auto Charging relay pin!!
     Timer heartbeat_timer, serial_timer;
     serial_message msg;
     uint8_t heartbeat_counter{0}, rsoc{0};
     float connector_v{0.0f}, connector_temp[2]{0.0f, 0.0f};
     uint32_t connect_check_count{0}, temperature_error_count{0};
-    int adc_ch{2};
-    bool adc_measure_mode{false}, temperature_error{false};
-    static constexpr int ADDR{0b10010010};
-    static constexpr uint32_t CONNECT_THRES_COUNT{100};
+    bool temperature_error{false};
+    static constexpr int ADDR{0b10010010}; // I2C adress for temp sensor
+    static constexpr uint32_t CONNECT_THRES_COUNT{100}; // Number of times that ...
     static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
                            CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)};
 };
 
-class bmu_controller {
+class bmu_controller { // Variables Implemented
 public:
     bmu_controller(can_driver &can) : can(can) {}
     void init() {
@@ -522,9 +522,9 @@ private:
         }
     }
     can_driver &can;
-    DigitalOut main_sw{PB_11, 0};
-    DigitalIn c_fet{PB_14}, d_fet{PB_15}, p_dsg{PA_9};
-    struct {
+    DigitalOut main_sw{bmu_main_sw, 0}; // MAIN_SW switch pin
+    DigitalIn c_fet{bmu_c_fet}, d_fet{bmu_d_fet}, p_dsg{bmu_p_dsg};
+        struct {
         int16_t pack_a{0};
         uint16_t pack_v{0};
         uint8_t mod_status1{0xff}, mod_status2{0xff}, bmu_alarm1{0xff}, bmu_alarm2{0xff};
@@ -532,12 +532,12 @@ private:
     } data;
 };
 
-class temperature_sensor {
+class temperature_sensor { // Variables Implemented
 public:
     void init() {
         uint8_t buf[2];
         buf[0] = 0x0b; // ID Register
-        I2C i2c{PB_7, PB_6};
+        I2C i2c{ts_i2c_sda, ts_i2c_scl};
         i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 1) == 0 &&
@@ -561,7 +561,7 @@ public:
     void poll() {
         uint8_t buf[2];
         buf[0] = 0x00; // Temperature Value MSB Register
-        I2C i2c{PB_7, PB_6};
+        I2C i2c{ts_i2c_sda, ts_i2c_scl};
         i2c.frequency(400000);
         if (i2c.write(ADDR, reinterpret_cast<const char*>(buf), 1, true) == 0 &&
             i2c.read(ADDR, reinterpret_cast<char*>(buf), 2) == 0) {
@@ -575,13 +575,15 @@ private:
     static constexpr int ADDR{0b10010000};
 };
 
-class dcdc_converter {
+class dcdc_converter { // Variables Implemented
 public:
     void set_enable(bool enable) {
         if (enable) {
             // control[0].write(1);
             control[2].write(1); // external 5V must be turned on first.
             control[1].write(1);
+            //control[2].write(1);    // control[2] controls the relay of the MAIN_SW of the BMU.
+            control[2].write(1);    // control[3] controls the relay that powers ON the main MCU
         } else {
             control[1].write(0); // 16V must be turned off first.
             // control[0].write(0);
@@ -589,25 +591,25 @@ public:
         }
     }
     bool is_ok() {
-        return /*fail[0].read() != 0 &&*/ fail[1].read() != 0;
+        return fail[0].read() != 0 && fail[1].read() != 0;
     }
     void get_failed_state(bool &v5, bool &v16) {
         v5 = fail[0].read() == 0;
         v16 = fail[1].read() == 0;
     }
 private:
-    DigitalOut control[3]{{PA_10, 0}, {PB_3, 0}, {PA_1, 0}};
-    DigitalIn fail[2]{{PA_15}, {PB_4}};
+    DigitalOut control[3]{{dcdc_control_5v, 0}, {dcdc_control_16v, 0}, {main_MCU_ON, 0}};
+    DigitalIn fail[2]{dcdc_failSignal_5v, dcdc_failSignal_16v};
 };
 
-class fan_driver {
+class fan_driver { // Variables Implemented
 public:
     void init() {
         pwm.period_us(1000000 / CONTROL_HZ);
         pwm.pulsewidth_us(0);
     }
     void control_by_temperature(float temperature) {
-        static constexpr float temp_min{15.0f}, temp_l{30.0f}, temp_h{50.0f};
+        static constexpr float temp_min{15.0f}, temp_l{20.0f}, temp_h{30.0f};
         static constexpr int duty_l{10}, duty_h{100};
         static constexpr float A{(duty_h - duty_l) / (temp_h - temp_l)};
         int duty_percent;
@@ -619,6 +621,9 @@ public:
             duty_percent = duty_h;
         else
             duty_percent = A * (temperature - temp_l) + duty_l; // Linearly interpolate between temp_l and temp_h.
+        control_by_duty(duty_percent);
+    }
+    void control_by_duty(int duty_percent) {
         int pulsewidth{duty_percent * 1000000 / 100 / CONTROL_HZ};
         pwm.pulsewidth_us(pulsewidth);
     }
@@ -626,11 +631,11 @@ public:
         return pwm.read_pulsewitdth_us() * CONTROL_HZ * 100 / 1000000;
     }
 private:
-    PwmOut pwm{PA_8};
+    PwmOut pwm{fan_pwm};
     static constexpr int CONTROL_HZ{5000};
 };
 
-class mainboard_controller {
+class mainboard_controller {  // No pins declared
 public:
     mainboard_controller(can_driver &can) : can(can) {}
     void init() {
@@ -661,6 +666,9 @@ public:
     bool is_overheat() const {
         return mainboard_overheat || actuatorboard_overheat;
     }
+    bool is_wheel_poweroff() const {
+        return wheel_poweroff;
+    }
 private:
     void handle_can(const CANMessage &msg) {
         heartbeat_timeout = false;
@@ -671,16 +679,17 @@ private:
         ros_heartbeat_timeout = msg.data[2] != 0;
         mainboard_overheat = msg.data[3] != 0;
         actuatorboard_overheat = msg.data[4] != 0;
+        wheel_poweroff = msg.data[5] != 0;
         if (!ros_heartbeat_timeout)
             heartbeat_detect = true;
     }
     can_driver &can;
     Timer timer;
     bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false},
-         mainboard_overheat{false}, actuatorboard_overheat{false};
+         mainboard_overheat{false}, actuatorboard_overheat{false}, wheel_poweroff{false};
 };
 
-class state_controller {
+class state_controller { // Variables Implemented
 public:
     void init() {
         mc.init();
@@ -711,8 +720,17 @@ private:
         AUTO_CHARGE,
         MANUAL_CHARGE,
         LOCKDOWN,
+        TIMEROFF,
     };
     void poll() {
+        auto wheel_relay_control = [&](){
+            bool wheel_poweroff{mbd.is_wheel_poweroff()};
+            if (last_wheel_poweroff != wheel_poweroff) {
+                last_wheel_poweroff = wheel_poweroff;
+                bat_out.write(wheel_poweroff ? 0 : 1);
+                LOG("wheel power control %d!\n", wheel_poweroff);
+            }
+        };
         can.poll();
         psw.poll();
         bsw.poll();
@@ -724,6 +742,10 @@ private:
         switch (state) {
         case POWER_STATE::OFF:
             set_new_state(mc.is_plugged() ? POWER_STATE::POST : POWER_STATE::WAIT_SW);
+            break;
+        case POWER_STATE::TIMEROFF:
+            if (timer_poweroff.elapsed_time() > 5s)
+                set_new_state(POWER_STATE::OFF);
             break;
         case POWER_STATE::WAIT_SW:
             if (psw.get_state() != power_switch::STATE::RELEASED) {
@@ -746,11 +768,12 @@ private:
             }
             break;
         case POWER_STATE::STANDBY: {
+            wheel_relay_control();
             auto psw_state{psw.get_state()};
             if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED) {
                 set_new_state(POWER_STATE::OFF);
             } else if (mbd.is_dead()) {
-                set_new_state(wait_shutdown ? POWER_STATE::OFF : POWER_STATE::LOCKDOWN);
+                set_new_state(wait_shutdown ? POWER_STATE::TIMEROFF : POWER_STATE::LOCKDOWN);
             } else if (psw_state == power_switch::STATE::PUSHED || mbd.power_off_from_ros() ||
                 mbd.is_overheat() || !bmu.is_ok() || !temp.is_ok()) {
                 if (wait_shutdown) {
@@ -783,6 +806,7 @@ private:
             break;
         }
         case POWER_STATE::NORMAL:
+            wheel_relay_control();
             if (psw.get_state() != power_switch::STATE::RELEASED) {
                 LOG("detect power switch\n");
                 set_new_state(POWER_STATE::STANDBY);
@@ -897,6 +921,7 @@ private:
         default:
             break;
         }
+        int bat_out_state{mbd.is_wheel_poweroff() ? 0 : 1};
         switch (newstate) {
         case POWER_STATE::OFF:
             LOG("enter OFF\n");
@@ -907,6 +932,11 @@ private:
             bat_out.write(0);
             while (true) // wait power off
                 continue;
+            break;
+        case POWER_STATE::TIMEROFF:
+            LOG("enter TIMEROFF\n");
+            timer_poweroff.reset();
+            timer_poweroff.start();
             break;
         case POWER_STATE::WAIT_SW:
             LOG("enter WAIT_SW\n");
@@ -924,14 +954,14 @@ private:
             psw.set_led(true);
             dcdc.set_enable(true);
             wsw.set_disable(true);
-            bat_out.write(0);
+            bat_out.write(bat_out_state);
             ac.set_enable(false);
             wait_shutdown = false;
             break;
         case POWER_STATE::NORMAL:
             LOG("enter NORMAL\n");
             wsw.set_disable(false);
-            bat_out.write(1);
+            bat_out.write(bat_out_state);
             ac.set_enable(false);
             charge_guard_asserted = true;
             charge_guard_timeout.attach([this](){charge_guard_asserted = false;}, 10s);
@@ -959,7 +989,12 @@ private:
     }
     void poll_100ms() {
         auto temperature{temp.get_temperature()};
-        fan.control_by_temperature(temperature);
+        if (state == POWER_STATE::AUTO_CHARGE ||
+            state == POWER_STATE::MANUAL_CHARGE) {
+            fan.control_by_duty(100);
+        } else {
+            fan.control_by_temperature(temperature);
+        }
         uint8_t buf[8]{0};
         if (psw.get_raw_state())
             buf[0] |= 0b00000001;
@@ -1026,7 +1061,7 @@ private:
         watchdog.kick();
     }
     void poll_10s() {
-        uint8_t buf[8]{'1', '0', '9', 'a'}; // version
+        uint8_t buf[8]{'2', '0', '3'}; // version
         can.send(CANMessage{0x203, buf});
     }
     can_driver can;
@@ -1041,7 +1076,7 @@ private:
     dcdc_converter dcdc;
     fan_driver fan;
     mainboard_controller mbd{can};
-    DigitalOut bat_out{PB_5, 0}, heartbeat_led{PB_12, 0};
+    DigitalOut bat_out{sc_bat_out, 0}, heartbeat_led{sc_hb_led, 0};
     POWER_STATE state{POWER_STATE::OFF};
     enum class SHUTDOWN_REASON {
         NONE,
@@ -1051,9 +1086,10 @@ private:
         POWERBOARD_TEMP,
         BMU,
     } shutdown_reason{SHUTDOWN_REASON::NONE};
-    Timer timer_post, timer_shutdown;
+    Timer timer_post, timer_shutdown, timer_poweroff;
     Timeout current_check_timeout, charge_guard_timeout;
-    bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false}, charge_guard_asserted{false};
+    bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false}, charge_guard_asserted{false},
+         last_wheel_poweroff{false};
 };
 
 }
