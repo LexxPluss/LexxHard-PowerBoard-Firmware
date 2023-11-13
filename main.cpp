@@ -954,14 +954,16 @@ private:
             psw.set_led(true);
             dcdc.set_enable(true);
             wsw.set_disable(true);
-            bat_out.write(bat_out_state);
+            bat_out.write(0);
+            // bat_out.write(bat_out_state);
             ac.set_enable(false);
             wait_shutdown = false;
             break;
         case POWER_STATE::NORMAL:
             LOG("enter NORMAL\n");
             wsw.set_disable(false);
-            bat_out.write(bat_out_state);
+            bat_out.write(1);
+            // bat_out.write(bat_out_state);
             ac.set_enable(false);
             charge_guard_asserted = true;
             charge_guard_timeout.attach([this](){charge_guard_asserted = false;}, 10s);
