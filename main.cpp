@@ -367,26 +367,18 @@ public:
                     if(heartbeat_timer.elapsed_time() < 5s){
                         return true;
                     }else{
-                        if(connected_to_charger){
-                            LOG("Fail:heartbeat_timer.elapsed_time() < 5s\n");
-                        }
+                        LOG("Fail:heartbeat_timer.elapsed_time() < 5s\n");
+                        return false;
                     }
                 }else{
-                    if(connected_to_charger){
-                        LOG("Fail:!is_overheat()\n");
-                    }
+                    LOG("Fail:!is_overheat()\n");
                     return false;
                 }
             }else{
-                if(connected_to_charger){
-                    LOG("Fail:!temperature_error\n");
-                }
+                LOG("Fail:!temperature_error\n");
                 return false;
             }
         }else{
-            if(connected_to_charger){
-                LOG("Fail:is_connected())\n");
-            }
             return false;
         }
         // return is_connected() && !temperature_error && !is_overheat() && heartbeat_timer.elapsed_time() < 5s;
@@ -420,13 +412,11 @@ public:
                 connect_check_count = CONNECT_THRES_COUNT;
                 if (prev_connect_check_count < CONNECT_THRES_COUNT)
                     LOG("connected to the charger.\n");
-                    connected_to_charger = true;
             }
         } else {
             connect_check_count = 0;
             if (prev_connect_check_count >= CONNECT_THRES_COUNT)
                 LOG("disconnected from the charger.\n");
-                connected_to_charger = false;
         }
 #ifndef SERIAL_DEBUG
         while (serial.readable()) {
@@ -499,7 +489,6 @@ private: // Thermistor side starts here.
     static constexpr uint32_t CONNECT_THRES_COUNT{100}; // Number of times that ...
     static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
                            CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)};
-    bool connected_to_charger{false};
 };
 
 class bmu_controller { // Variables Implemented
@@ -872,13 +861,6 @@ private:
                 LOG("docked to auto charger\n");
                 set_new_state(POWER_STATE::AUTO_CHARGE);
             }
-            // else if(charge_guard_asserted){
-            //     LOG("charge_guard_asserted\n");
-            // }else if(!ac.is_docked()){
-            //     LOG("!ac.is_docked()\n");
-            // }else if(!bmu.is_chargable()){
-            //     LOG("!bmu.is_chargable())\n");
-            // }
             break;
         case POWER_STATE::AUTO_CHARGE:
             ac.update_rsoc(bmu.get_rsoc());
