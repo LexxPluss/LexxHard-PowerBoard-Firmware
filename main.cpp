@@ -578,15 +578,15 @@ private:
 class dcdc_converter { // Variables Implemented
 public:
     void set_enable(bool enable) {
-        if (enable) {
-            // control[0].write(1);
-            control[2].write(1); // external 5V must be turned on first.
+        if (enable) {               // In this configuration 0=OFF, 1=ON
+            control[0].write(1);    // external 5V must be turned on first.
             control[1].write(1);
             //control[2].write(1);    // control[2] controls the relay of the MAIN_SW of the BMU.
             control[2].write(1);    // control[3] controls the relay that powers ON the main MCU
         } else {
-            control[1].write(0); // 16V must be turned off first.
-            // control[0].write(0);
+            control[1].write(0);    // 16V must be turned off first.
+            control[0].write(0);
+            // control[2].write(0);
             control[2].write(0);
         }
     }
