@@ -770,7 +770,11 @@ private:
         case POWER_STATE::STANDBY: {
             wheel_relay_control();
             auto psw_state{psw.get_state()};
-            if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED) {
+            // if (!dcdc.is_ok() || psw_state == power_switch::STATE::LONG_PUSHED) {
+            if (!dcdc.is_ok()) {
+                LOG("!!!DCDC Failed!!!\n");
+                set_new_state(POWER_STATE::NORMAL);
+            } else if(psw_state == power_switch::STATE::LONG_PUSHED){
                 set_new_state(POWER_STATE::OFF);
             } else if (mbd.is_dead()) {
                 set_new_state(wait_shutdown ? POWER_STATE::TIMEROFF : POWER_STATE::LOCKDOWN);
