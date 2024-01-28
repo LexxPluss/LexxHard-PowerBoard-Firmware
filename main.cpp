@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, LexxPluss Inc.
+ * Copyright (c) 2022-2024, LexxPluss Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -264,8 +264,16 @@ public:
             ++left_count;
         }
         if (left_count > COUNT) {
+            bool left_asserted_prev{left_asserted};
             left_count = COUNT;
             left_asserted = now == 1;
+            if (!left_asserted_prev && left_asserted) {
+                left_timer.reset();
+                left_timer.start();
+            } else if (!left_asserted) {
+                left_timer.reset();
+                left_timer.stop();
+            }
         }
         now = right.read();
         if (right_prev != now) {
@@ -275,11 +283,31 @@ public:
             ++right_count;
         }
         if (right_count > COUNT) {
+            bool right_asserted_prev{right_asserted};
+            left_count = COUNT;
             right_count = COUNT;
             right_asserted = now == 1;
+            if (!right_asserted_prev && right_asserted) {
+                right_timer.reset();
+                right_timer.start();
+            } else if (!right_asserted) {
+                right_timer.reset();
+                right_timer.stop();
+            }
         }
     }
-    bool asserted() const {return left_asserted || right_asserted;}
+    // bool asserted() const {
+    bool asserted() {
+        auto left_elapsed{left_timer.elapsed_time()};
+        auto right_elapsed{right_timer.elapsed_time()};
+        if (left_elapsed > 100ms || right_elapsed > 100ms) {  // TODO replace 100ms
+            left_timer.stop();
+            right_timer.stop();
+            return true;
+        } else {
+            return false;
+        }
+    }
     void get_raw_state(bool &left, bool &right) const {
         left = left_asserted;
         right = right_asserted;
@@ -289,6 +317,7 @@ private:
     uint32_t left_count{0}, right_count{0};
     int left_prev{-1}, right_prev{-1};
     bool left_asserted{false}, right_asserted{false};
+    Timer left_timer, right_timer;
     static constexpr uint32_t COUNT{5};
 };
 
@@ -642,14 +671,21 @@ public:
         can.register_callback(0x201, callback(this, &mainboard_controller::handle_can));
     }
     void poll() {
-        if (timer.elapsed_time() > 3s) {
+        if (heartbeat_timer.elapsed_time() > 3s) {
             heartbeat_timeout = true;
-            timer.stop();
-            timer.reset();
+            heartbeat_timer.stop();
+            heartbeat_timer.reset();
         }
     }
-    bool emergency_stop_from_ros() const {
-        return emergency_stop;
+    bool emergency_stop_from_ros() {
+        auto elapsed{delay_timer.elapsed_time()};
+        if (elapsed > 1s) {
+            delay_timer.stop();
+            delay_timer.reset();
+            return true;
+        } else {
+            return false;
+        }
     }
     bool power_off_from_ros() const {
         return power_off;
@@ -671,20 +707,28 @@ public:
     }
 private:
     void handle_can(const CANMessage &msg) {
+        bool emergency_stop_prev{emergency_stop};
         heartbeat_timeout = false;
-        timer.reset();
-        timer.start();
+        heartbeat_timer.reset();
+        heartbeat_timer.start();
         emergency_stop = msg.data[0] != 0;
         power_off = msg.data[1] != 0;
         ros_heartbeat_timeout = msg.data[2] != 0;
         mainboard_overheat = msg.data[3] != 0;
         actuatorboard_overheat = msg.data[4] != 0;
         wheel_poweroff = msg.data[5] != 0;
+        if (!emergency_stop_prev && emergency_stop) {
+            delay_timer.reset();
+            delay_timer.start();
+        } else if (!emergency_stop) {
+            delay_timer.reset();
+            delay_timer.stop();
+        }
         if (!ros_heartbeat_timeout)
             heartbeat_detect = true;
     }
     can_driver &can;
-    Timer timer;
+    Timer heartbeat_timer, delay_timer;
     bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false},
          mainboard_overheat{false}, actuatorboard_overheat{false}, wheel_poweroff{false};
 };
