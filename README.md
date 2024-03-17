@@ -68,6 +68,9 @@ Main Board and ROS Status (Published from Main Board)
 | 0 | Emergency stop | 1:asserted |
 | 1 | Power off | 1:asserted |
 | 2 | ROS Heartbeat timeout | 1:asserted |
+| 3 | mainboard overheat | |
+| 4 | actuatorboard overheat | |
+| 5 | wheel poweroff | |
 
 ### 514 (0x202)
 
