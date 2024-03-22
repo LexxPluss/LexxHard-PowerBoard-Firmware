@@ -71,8 +71,6 @@ Main Board and ROS Status (Published from Main Board)
 | 3 | mainboard overheat | |
 | 4 | actuatorboard overheat | |
 | 5 | wheel poweroff | |
-| 6 | delay time (LSB) | software braking system's delay (LSB) (ms) |
-| 7 | delay time (MSB) | software braking system's delay (MSB) (ms) |
 
 ### 514 (0x202)
 

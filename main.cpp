@@ -264,6 +264,7 @@ public:
             ++left_count;
         }
         if (left_count > COUNT) {
+            left_count = COUNT;
             bool left_asserted_prev{left_asserted};
             left_asserted = now == 1;
             if (!left_asserted_prev && left_asserted) {
@@ -282,6 +283,7 @@ public:
             ++right_count;
         }
         if (right_count > COUNT) {
+            right_count = COUNT;
             bool right_asserted_prev{right_asserted};
             right_asserted = now == 1;
             if (!right_asserted_prev && right_asserted) {
@@ -296,8 +298,8 @@ public:
     bool asserted() {
         auto left_elapsed{left_timer.elapsed_time().count()};
         auto right_elapsed{right_timer.elapsed_time().count()};
-        if (left_elapsed  >= (delay_time_ms*1000) ||
-            right_elapsed >= (delay_time_ms*1000)) {
+        if (left_elapsed  >= (DELAY_TIME_MS*1000) ||
+            right_elapsed >= (DELAY_TIME_MS*1000)) {
             left_timer.stop();
             right_timer.stop();
             return true;
@@ -309,9 +311,6 @@ public:
         left = left_asserted;
         right = right_asserted;
     }
-    void set_delay_time(const uint16_t t) {
-        delay_time_ms = t;
-    }
 private:
     DigitalIn left{es_left}, right{es_right};
     uint32_t left_count{0}, right_count{0};
@@ -319,7 +318,7 @@ private:
     bool left_asserted{false}, right_asserted{false};
     Timer left_timer, right_timer;
     static constexpr uint32_t COUNT{5};
-    uint16_t delay_time_ms{100};
+    static constexpr uint16_t DELAY_TIME_MS{500};
 };
 
 class wheel_switch { // Variables Implemented
@@ -680,7 +679,7 @@ public:
     }
     bool emergency_stop_from_ros() {
         auto elapsed{delay_timer.elapsed_time().count()};
-        if (elapsed > delay_time_ms*1000) {
+        if (elapsed > DELAY_TIME_MS*1000) {
             delay_timer.stop();
             delay_timer.reset();
             return true;
@@ -706,9 +705,6 @@ public:
     bool is_wheel_poweroff() const {
         return wheel_poweroff;
     }
-    uint16_t delay_time_ms_from_ros() const {
-        return delay_time_ms;
-    }
 private:
     void handle_can(const CANMessage &msg) {
         bool emergency_stop_prev{emergency_stop};
@@ -721,7 +717,6 @@ private:
         mainboard_overheat = msg.data[3] != 0;
         actuatorboard_overheat = msg.data[4] != 0;
         wheel_poweroff = msg.data[5] != 0;
-        delay_time_ms = msg.data[7] << 8 | msg.data[6];
         if (!emergency_stop_prev && emergency_stop) {
             delay_timer.reset();
             delay_timer.start();
@@ -736,7 +731,7 @@ private:
     Timer heartbeat_timer, delay_timer;
     bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false},
          mainboard_overheat{false}, actuatorboard_overheat{false}, wheel_poweroff{false};
-    uint16_t delay_time_ms{100};
+    static constexpr uint16_t DELAY_TIME_MS{500};
 };
 
 class state_controller { // Variables Implemented
@@ -789,7 +784,6 @@ private:
         ac.poll();
         temp.poll();
         mbd.poll();
-        esw.set_delay_time(mbd.delay_time_ms_from_ros());
         switch (state) {
         case POWER_STATE::OFF:
             set_new_state(mc.is_plugged() ? POWER_STATE::POST : POWER_STATE::WAIT_SW);
