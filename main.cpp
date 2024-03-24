@@ -681,7 +681,6 @@ public:
         auto elapsed{delay_timer.elapsed_time().count()};
         if (elapsed > DELAY_TIME_MS*1000) {
             delay_timer.stop();
-            delay_timer.reset();
             return true;
         } else {
             return false;
