@@ -31,7 +31,7 @@ When writing on battery power, the power switch must be held down to prevent pow
 ### STLINK Tools (Open souce version)
 
 ```bash
-$ st-flash --connect-under-reset cmake_build/LEXXPLUSS_PB01/develop/GCC_ARM/LexxHard-PowerBoard-Firmware.bin 0x8000000
+$ st-flash --connect-under-reset write cmake_build/LEXXPLUSS_PB01/develop/GCC_ARM/LexxHard-PowerBoard-Firmware.bin 0x8000000
 ```
 
 ### STM32CubeProgrammer
@@ -68,6 +68,9 @@ Main Board and ROS Status (Published from Main Board)
 | 0 | Emergency stop | 1:asserted |
 | 1 | Power off | 1:asserted |
 | 2 | ROS Heartbeat timeout | 1:asserted |
+| 3 | mainboard overheat | |
+| 4 | actuatorboard overheat | |
+| 5 | wheel poweroff | |
 
 ### 514 (0x202)
 
