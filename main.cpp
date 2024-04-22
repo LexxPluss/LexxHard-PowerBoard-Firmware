@@ -391,7 +391,6 @@ public:
     }
     bool is_docked() const {
         return is_connected() && !temperature_error && !is_overheat() && heartbeat_timer.elapsed_time() < 5s;
-        // return is_charger_ready() && is_connected() && !temperature_error && !is_overheat() && heartbeat_timer.elapsed_time() < 5s;
     }
     void set_enable(bool enable) {
         sw.write(enable ? 1 : 0);
@@ -904,8 +903,6 @@ private:
                     LOG("docked to auto charger\n");
                     set_new_state(POWER_STATE::AUTO_CHARGE);
                 }
-                // LOG("docked to auto charger\n");
-                // set_new_state(POWER_STATE::AUTO_CHARGE);
             }
             break;
         case POWER_STATE::AUTO_CHARGE:
