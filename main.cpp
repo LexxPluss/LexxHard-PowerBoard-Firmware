@@ -400,10 +400,10 @@ public:
         send_heartbeat();
     }
     bool is_charger_ready() const {
-        if(connector_v > (CHARGING_VOLTAGE * 0.9)){
+        if (connector_v > (CHARGING_VOLTAGE * 0.9)) {
             LOG("charger ready voltage:%f.\n", connector_v);
             return true;
-        }else {
+        } else {
             LOG("connector_v:%f THRESH:%f\n", connector_v, (CHARGING_VOLTAGE * 0.9));
             return false;
         }
