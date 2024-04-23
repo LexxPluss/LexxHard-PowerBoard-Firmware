@@ -486,9 +486,9 @@ private: // Thermistor side starts here.
     void send_heartbeat() {                                                    /* Creates the message to send to the robot using the "compose" function below */
         uint8_t sw_state{0};
 
-        if(is_connected()){
+        if (is_connected()) {
             sw_state = 1;
-        }else{
+        } else {
             sw_state = 0;
         }
          
@@ -899,7 +899,7 @@ private:
                 LOG("plugged to manual charger\n");
                 set_new_state(POWER_STATE::MANUAL_CHARGE);
             } else if (!charge_guard_asserted && ac.is_docked() && bmu.is_chargable()) {
-                if(ac.is_charger_ready() == true){
+                if (ac.is_charger_ready() == true) {
                     LOG("docked to auto charger\n");
                     set_new_state(POWER_STATE::AUTO_CHARGE);
                 }
