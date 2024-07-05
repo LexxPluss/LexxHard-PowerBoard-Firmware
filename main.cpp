@@ -318,7 +318,7 @@ private:
     bool left_asserted{false}, right_asserted{false};
     Timer left_timer, right_timer;
     static constexpr uint32_t COUNT{5};
-    static constexpr uint32_t DELAY_TIME_MS{500};
+    static constexpr uint32_t DELAY_TIME_MS{2000};
 };
 
 class wheel_switch { // Variables Implemented
@@ -747,7 +747,7 @@ private:
     Timer heartbeat_timer, delay_timer;
     bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false},
          mainboard_overheat{false}, actuatorboard_overheat{false}, wheel_poweroff{false};
-    static constexpr uint32_t DELAY_TIME_MS{500};
+    static constexpr uint32_t DELAY_TIME_MS{2000};
 };
 
 class state_controller { // Variables Implemented
