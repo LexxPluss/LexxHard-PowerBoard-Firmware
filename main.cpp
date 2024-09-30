@@ -164,6 +164,10 @@ public:
     enum class STATE {
         RELEASED, PUSHED, LONG_PUSHED,
     };
+    void init() {
+        led.period_us(1000000 / CONTROL_HZ);
+        led.pulsewidth_us(0);
+    }
     void poll() {
         int now{sw.read()};
         if (prev_raw != now) {
@@ -207,10 +211,13 @@ public:
         return sw.read() == 0;
     }
     void set_led(bool enabled) {
-        led.write(enabled ? 1 : 0);
+        int duty_percent = enabled ? LED_ON_DUTY : 0;
+        int pulsewidth{duty_percent * 1000000 / 100 / CONTROL_HZ};
+        led.pulsewidth_us(pulsewidth);
     }
     void toggle_led() {
-        led.write(led.read() == 0 ? 1 : 0);
+        auto const state = 0 < led.read_pulsewitdth_us();
+        set_led(!state);
     }
     bool is_activated_battery() const {
         return sw_bat.is_activated();
@@ -221,12 +228,14 @@ public:
 private:
     power_switch_handler sw_bat{2}, sw_unlock{10};
     DigitalIn sw{ps_sw_in};
-    DigitalOut led{ps_led_out, 0};
+    PwmOut led{ps_led_out};
     Timer timer;
     STATE state{STATE::RELEASED};
     uint32_t count{0};
     int prev{-1}, prev_raw{-1};
     static constexpr uint32_t COUNT{1};
+    static constexpr int CONTROL_HZ{5000};
+    static constexpr int LED_ON_DUTY{100};
 };
 
 class bumper_switch { // Variables Implemented
@@ -759,6 +768,7 @@ public:
         temp.init();
         fan.init();
         mbd.init();
+        psw.init();
         logger.set_can_driver(&can);
         globalqueue.call_every(20ms, this, &state_controller::poll);
         globalqueue.call_every(100ms, this, &state_controller::poll_100ms);
