@@ -59,6 +59,28 @@ inline const T &clamp(const T &val, const T &min, const T &max)
     return val < min ? min : (val > max ? max : val);
 }
 
+template<int Value>
+class MockDigitalIn : public DigitalIn{
+public:
+    int read() {
+        return Value;
+    }
+};
+
+template<int Value1000x>
+class MockAnalogIn : public AnalogIn{
+public:
+    template<typename ...Args>
+    MockAnalogIn(Args &&...args) : AnalogIn(std::forward<Args>(args)...) {};
+
+    float read() {
+        return clamp(Value1000x, 0, 1000) / 1000.0f;
+    }
+};
+
+using MockLowDigitalIn = MockDigitalIn<0>;
+using MockHighDigitalIn = MockDigitalIn<1>;
+
 class can_callback { // No pins declared
 public:
     void register_callback(uint32_t msgid, Callback<void(const CANMessage &msg)> func) {
@@ -220,7 +242,7 @@ public:
     }
 private:
     power_switch_handler sw_bat{2}, sw_unlock{10};
-    DigitalIn sw{ps_sw_in};
+    MockHighDigitalIn sw{ps_sw_in};
     DigitalOut led{ps_led_out, 0};
     Timer timer;
     STATE state{STATE::RELEASED};
@@ -248,7 +270,7 @@ public:
 #endif
     }
 private:
-    DigitalIn left{bp_left};
+    MockHighDigitalIn left{bp_left};
     Timeout timeout;
     bool asserted{false};
 };
@@ -312,7 +334,7 @@ public:
         right = right_asserted;
     }
 private:
-    DigitalIn left{es_left}, right{es_right};
+    MockLowDigitalIn left{es_left}, right{es_right};
     uint32_t left_count{0}, right_count{0};
     int left_prev{-1}, right_prev{-1};
     bool left_asserted{false}, right_asserted{false};
@@ -371,7 +393,7 @@ private:
         }
         plugged = plugped_count > 5;
     }
-    DigitalIn din{mc_din};
+    MockHighDigitalIn din{mc_din};
     Timer timer;
     int prev{1};
     bool plugged{false};
@@ -501,9 +523,9 @@ private: // Thermistor side starts here.
 #ifndef SERIAL_DEBUG
     BufferedSerial serial{ac_IrDA_tx, ac_IrDA_rx}; // IrDA serial pins
 #endif
-    AnalogIn connector{ac_analogVol, 3.3f}; // Charging connector pin 0 - 24V. (3.3f max voltage reference - map voltage between 0 - 3.3V)
-    AnalogIn therm_pos{ac_th_pos, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
-    AnalogIn therm_neg{ac_th_neg, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
+    MockAnalogIn<0> connector{ac_analogVol, 3.3f}; // Charging connector pin 0 - 24V. (3.3f max voltage reference - map voltage between 0 - 3.3V)
+    MockAnalogIn<0> therm_pos{ac_th_pos, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
+    MockAnalogIn<0> therm_neg{ac_th_neg, 3.3f}; // Charging connector pin where the input is 0 - 24V. (map voltage between 0 - 3.3V)
     DigitalOut sw{ac_chargingRelay, 0}; // declare the robot auto Charging relay pin!!
     Timer heartbeat_timer, serial_timer;
     serial_message msg;
@@ -569,12 +591,12 @@ private:
     }
     can_driver &can;
     DigitalOut main_sw{bmu_main_sw, 0}; // MAIN_SW switch pin
-    DigitalIn c_fet{bmu_c_fet}, d_fet{bmu_d_fet}, p_dsg{bmu_p_dsg};
-        struct {
+    MockHighDigitalIn c_fet{bmu_c_fet}, d_fet{bmu_d_fet}, p_dsg{bmu_p_dsg};
+    struct {
         int16_t pack_a{0};
         uint16_t pack_v{0};
-        uint8_t mod_status1{0xff}, mod_status2{0xff}, bmu_alarm1{0xff}, bmu_alarm2{0xff};
-        uint8_t asoc{0}, rsoc{0};
+        uint8_t mod_status1{0b01000000}, mod_status2{0xff}, bmu_alarm1{0xff}, bmu_alarm2{0xff};
+        uint8_t asoc{0}, rsoc{99};
     } data;
 };
 
@@ -707,13 +729,10 @@ public:
         return power_off;
     }
     bool is_dead() const {
-        if (heartbeat_detect)
-            return heartbeat_timeout || ros_heartbeat_timeout;
-        else
-            return false;
+        return false; // never die
     }
     bool is_ready() const {
-        return heartbeat_detect;
+        return true; // always ready
     }
     bool is_overheat() const {
         return mainboard_overheat || actuatorboard_overheat;
@@ -809,7 +828,8 @@ private:
                 set_new_state(POWER_STATE::OFF);
             break;
         case POWER_STATE::WAIT_SW:
-            if (psw.get_state() != power_switch::STATE::RELEASED) {
+            // power is always on
+            if (true) {
                 poweron_by_switch = true;
                 psw.reset_state();
                 set_new_state(POWER_STATE::POST);
