@@ -643,6 +643,13 @@ public:
         v5 = fail[0].read() == 0;
         v16 = fail[1].read() == 0;
     }
+    void set_enable_16v(bool enable) {
+        if (enable) {               // In this configuration 0=OFF, 1=ON
+            control[1].write(1);
+        } else {
+            control[1].write(0);    // 16V must be turned off first.
+        }
+    }
 private:
     DigitalOut control[3]{{dcdc_control_5v, 0}, {dcdc_control_16v, 0}, {main_MCU_ON, 0}};
     DigitalIn fail[2]{dcdc_failSignal_5v, dcdc_failSignal_16v};
@@ -721,6 +728,11 @@ public:
     bool is_wheel_poweroff() const {
         return wheel_poweroff;
     }
+    uint8_t retrieve_remain_count() {
+        uint8_t ret{remain_count};
+        remain_count = 0;
+        return ret;
+    }
 private:
     void handle_can(const CANMessage &msg) {
         bool emergency_stop_prev{emergency_stop};
@@ -742,12 +754,15 @@ private:
         }
         if (!ros_heartbeat_timeout)
             heartbeat_detect = true;
+
+        remain_count = msg.data[6];
     }
     can_driver &can;
     Timer heartbeat_timer, delay_timer;
     bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false},
          mainboard_overheat{false}, actuatorboard_overheat{false}, wheel_poweroff{false};
     static constexpr uint32_t DELAY_TIME_MS{2000};
+    uint8_t remain_count{0};
 };
 
 class state_controller { // Variables Implemented
@@ -764,6 +779,7 @@ public:
         globalqueue.call_every(100ms, this, &state_controller::poll_100ms);
         globalqueue.call_every(1s, this, &state_controller::poll_1s);
         globalqueue.call_every(10s, this, &state_controller::poll_10s);
+        globalqueue.call_every(10ms, this, &state_controller::poll_10ms);
         Watchdog &watchdog{Watchdog::get_instance()};
         uint32_t watchdog_max{watchdog.get_max_timeout()};
         uint32_t watchdog_timeout{10000U};
@@ -782,6 +798,7 @@ private:
         MANUAL_CHARGE,
         LOCKDOWN,
         TIMEROFF,
+        TEST_16V
     };
     void poll() {
         auto wheel_relay_control = [&](){
@@ -868,6 +885,8 @@ private:
         }
         case POWER_STATE::NORMAL:
             wheel_relay_control();
+
+            set_new_state(POWER_STATE::TEST_16V);
             if (psw.get_state() != power_switch::STATE::RELEASED) {
                 LOG("detect power switch\n");
                 set_new_state(POWER_STATE::STANDBY);
@@ -903,6 +922,27 @@ private:
                     LOG("docked to auto charger\n");
                     set_new_state(POWER_STATE::AUTO_CHARGE);
                 }
+            }
+            break;
+        case POWER_STATE::TEST_16V:
+            if (psw.get_state() != power_switch::STATE::RELEASED) {
+                LOG("detect power switch\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (!bmu.is_ok()) {
+                LOG("BMU failure\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (!temp.is_ok()) {
+                LOG("power board overheat\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (esw.asserted()) {
+                LOG("emergency switch asserted\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (mbd.is_dead()) {
+                LOG("main board or ROS dead\n");
+                set_new_state(POWER_STATE::STANDBY);
+            } else if (mbd.is_overheat()) {
+                LOG("main or actuator board overheat\n");
+                set_new_state(POWER_STATE::STANDBY);
             }
             break;
         case POWER_STATE::AUTO_CHARGE:
@@ -1029,6 +1069,9 @@ private:
             charge_guard_asserted = true;
             charge_guard_timeout.attach([this](){charge_guard_asserted = false;}, 10s);
             break;
+        case POWER_STATE::TEST_16V:
+            LOG("enter TEST_V16V\n");
+            break;
         case POWER_STATE::AUTO_CHARGE:
             LOG("enter AUTO_CHARGE\n");
             ac.set_enable(true);
@@ -1124,8 +1167,28 @@ private:
         watchdog.kick();
     }
     void poll_10s() {
-        uint8_t buf[8]{'2', '2', '2'}; // version
+        uint8_t buf[8]{'2', '2', '3'}; // version
         can.send(CANMessage{0x203, buf});
+    }
+    void poll_10ms() {
+        if (state != POWER_STATE::TEST_16V) {
+            return;
+        }
+
+        if (remain_count == 0) { 
+            remain_count = mbd.retrieve_remain_count();
+            dcdc.set_enable_16v(true);
+            return;
+        }
+
+        dcdc.set_enable_16v(false);
+        if (10 <= remain_count) {
+            remain_count -= 10;
+        } else {
+            ThisThread::sleep_for(remain_count * 1ms);
+            dcdc.set_enable_16v(true);
+            remain_count = 0;
+        }
     }
     can_driver can;
     power_switch psw;
@@ -1153,6 +1216,8 @@ private:
     Timeout current_check_timeout, charge_guard_timeout;
     bool poweron_by_switch{false}, wait_shutdown{false}, current_check_enable{false}, charge_guard_asserted{false},
          last_wheel_poweroff{false};
+
+    uint8_t remain_count{0};
 };
 
 }
