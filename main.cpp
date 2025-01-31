@@ -62,6 +62,9 @@ inline const T &clamp(const T &val, const T &min, const T &max)
 template<int Value>
 class MockDigitalIn : public DigitalIn{
 public:
+    template<typename ...Args>
+    MockDigitalIn(Args &&...args) : DigitalIn(std::forward<Args>(args)...) {};
+
     int read() {
         return Value;
     }
