@@ -399,6 +399,12 @@ public:
         set_enable(false);
         send_heartbeat();
     }
+    void stop_if_needed() {
+        if (!request_enabled) {
+            force_stop();
+        }
+        return;
+    }
     bool is_charger_ready() const {
         if (connector_v > (CHARGING_VOLTAGE * 0.9)) {
             LOG("charger ready voltage:%f.\n", connector_v);
@@ -422,7 +428,9 @@ public:
         return clamp(static_cast<uint32_t>(seconds.count()), 0UL, 255UL);
     }
     bool is_temperature_error() const {return temperature_error;}
-    void poll() {
+    void poll(bool request_enable) {
+        request_enabled = request_enable;
+
         uint32_t prev_connect_check_count{connect_check_count};
         connector_v = connector.read_voltage();  // Read the voltage from the auto charging terminals
         if (connector_v > CONNECT_THRES_VOLTAGE) {
@@ -456,6 +464,9 @@ public:
     void update_rsoc(uint8_t rsoc) {
         this->rsoc = rsoc;
     }
+    bool is_charging_voltage_ok() {
+        return is_charger_ready() || request_enabled;
+    }
 private: // Thermistor side starts here.
     void adc_read() { // Change to read the temperature sensor from ADC pin directly. Thermistor side.
         float v_th_pos{therm_pos.read_voltage()}; // Read the positive thermistor voltage
@@ -483,16 +494,21 @@ private: // Thermistor side starts here.
         if (is_connected() && !temperature_error && !is_overheat())
             send_heartbeat();
     }
-    void send_heartbeat() {                                                    /* Creates the message to send to the robot using the "compose" function below */
+    void make_heartbeat_payload(uint8_t param[]) {
         uint8_t sw_state{0};
-
-        if (is_connected()) {
+        if (is_connected() && request_enabled) {
             sw_state = 1;
         } else {
             sw_state = 0;
         }
 
-        uint8_t buf[8], param[3]{++heartbeat_counter, sw_state, rsoc}; // Message composed of 8 bytes, 3 bytes parameters -- Declaration
+        param[0] = ++heartbeat_counter;
+        param[1] = sw_state;
+        param[2] = rsoc;
+    }
+    void send_heartbeat() {                                                    /* Creates the message to send to the robot using the "compose" function below */
+        uint8_t buf[8], param[3]; // Message composed of 8 bytes, 3 bytes parameters -- Declaration
+        make_heartbeat_payload(param);
         serial_message::compose(buf, serial_message::HEARTBEAT, param);
 #ifndef SERIAL_DEBUG
         serial.write(buf, sizeof buf);
@@ -515,6 +531,7 @@ private: // Thermistor side starts here.
     static constexpr uint32_t CONNECT_THRES_COUNT{100}; // Number of times that ...
     static constexpr float CHARGING_VOLTAGE{30.0f * 1000.0f / (9100.0f + 1000.0f)},
                            CONNECT_THRES_VOLTAGE{3.3f * 0.5f * 1000.0f / (9100.0f + 1000.0f)};
+    bool request_enabled{false};
 };
 
 class bmu_controller { // Variables Implemented
@@ -706,6 +723,9 @@ public:
     bool power_off_from_ros() const {
         return power_off;
     }
+    bool auto_charge_request_enable_from_ros() const {
+        return auto_charge_request_enable;
+    }
     bool is_dead() const {
         if (heartbeat_detect)
             return heartbeat_timeout || ros_heartbeat_timeout;
@@ -733,6 +753,7 @@ private:
         mainboard_overheat = msg.data[3] != 0;
         actuatorboard_overheat = msg.data[4] != 0;
         wheel_poweroff = msg.data[5] != 0;
+        auto_charge_request_enable = (5 < msg.len) ?  msg.data[6] != 0 : false;
         if (!emergency_stop_prev && emergency_stop) {
             delay_timer.reset();
             delay_timer.start();
@@ -746,7 +767,7 @@ private:
     can_driver &can;
     Timer heartbeat_timer, delay_timer;
     bool heartbeat_timeout{true}, heartbeat_detect{false}, ros_heartbeat_timeout{false}, emergency_stop{true}, power_off{false},
-         mainboard_overheat{false}, actuatorboard_overheat{false}, wheel_poweroff{false};
+         mainboard_overheat{false}, actuatorboard_overheat{false}, wheel_poweroff{false}, auto_charge_request_enable{false};
     static constexpr uint32_t DELAY_TIME_MS{2000};
 };
 
@@ -797,7 +818,7 @@ private:
         bsw.poll();
         esw.poll();
         mc.poll();
-        ac.poll();
+        ac.poll(mbd.auto_charge_request_enable_from_ros());
         temp.poll();
         mbd.poll();
         switch (state) {
@@ -907,6 +928,7 @@ private:
             break;
         case POWER_STATE::AUTO_CHARGE:
             ac.update_rsoc(bmu.get_rsoc());
+            ac.stop_if_needed();
             if (psw.get_state() != power_switch::STATE::RELEASED) {
                 LOG("detect power switch\n");
                 set_new_state(POWER_STATE::STANDBY);
@@ -936,6 +958,9 @@ private:
                 set_new_state(POWER_STATE::STANDBY);
             } else if (bmu.is_full_charge()) {
                 LOG("full charge\n");
+                set_new_state(POWER_STATE::NORMAL);
+            } else if (!ac.is_charging_voltage_ok()) {
+                LOG("auto charging stopped\n");
                 set_new_state(POWER_STATE::NORMAL);
             } else if (!ac.is_docked()) {
                 LOG("undocked from auto charger\n");
@@ -1124,7 +1149,7 @@ private:
         watchdog.kick();
     }
     void poll_10s() {
-        uint8_t buf[8]{'2', '2', '2'}; // version
+        uint8_t buf[8]{'2', '3', '0'}; // version
         can.send(CANMessage{0x203, buf});
     }
     can_driver can;
